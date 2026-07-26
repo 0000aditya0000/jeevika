@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
-import { getDb, COLLECTIONS } from '@/lib/mongo';
+import { sb, fromRow, toRow } from '@/lib/supabase';
 import { hashPassword, verifyPassword, signToken, verifyToken } from '@/lib/auth';
 import { sendEmail, orderPlacedEmail } from '@/lib/email';
 import { CATEGORIES, PRODUCTS, TESTIMONIALS, ADMIN_SEED } from '@/lib/seed-data';
@@ -9,30 +9,48 @@ const json = (data, status = 200) => NextResponse.json(data, { status });
 const err = (message, status = 400) => NextResponse.json({ error: message }, { status });
 
 async function ensureSeed() {
-  const db = await getDb();
-  const settings = await db.collection(COLLECTIONS.settings).findOne({ key: 'seeded' });
-  if (settings?.value === true) return;
-  const now = new Date();
+  const client = sb();
+  const { data: existing } = await client.from('settings').select('value').eq('key', 'seeded').maybeSingle();
+  if (existing?.value === true) return;
+
   // Categories
-  const cats = CATEGORIES.map(c => ({ id: uuid(), ...c, status: 'active', displayOrder: 0, createdAt: now }));
-  await db.collection(COLLECTIONS.categories).insertMany(cats);
-  // Products
-  const prods = PRODUCTS.map(p => ({ id: uuid(), ...p, offerPercentage: p.discountPrice ? Math.round(((p.price - p.discountPrice) / p.price) * 100) : 0, status: 'active', rating: 4.5 + Math.random() * 0.5, reviewCount: Math.floor(Math.random() * 40) + 10, createdAt: now }));
-  await db.collection(COLLECTIONS.products).insertMany(prods);
+  const catRows = CATEGORIES.map(c => ({ ...c, status: 'active', display_order: 0 }));
+  await client.from('categories').insert(catRows);
+
+  // Products (map camelCase to snake_case)
+  const prodRows = PRODUCTS.map(p => ({
+    name: p.name, slug: p.slug, sku: p.sku, category: p.category,
+    description: p.description, short_description: p.shortDescription,
+    price: p.price, discount_price: p.discountPrice,
+    offer_percentage: p.discountPrice ? Math.round(((p.price - p.discountPrice) / p.price) * 100) : 0,
+    stock: p.stock, material: p.material, fabric: p.fabric,
+    colors: p.colors, sizes: p.sizes, images: p.images, thumbnail: p.thumbnail, tags: p.tags,
+    trending: p.trending, featured: p.featured, best_seller: p.bestSeller,
+    new_arrival: p.newArrival, hot_deal: p.hotDeal,
+    rating: +(4.5 + Math.random() * 0.5).toFixed(2),
+    review_count: Math.floor(Math.random() * 40) + 10,
+    status: 'active',
+  }));
+  await client.from('products').insert(prodRows);
+
   // Testimonials
-  await db.collection(COLLECTIONS.testimonials).insertMany(TESTIMONIALS.map(t => ({ id: uuid(), ...t, createdAt: now })));
-  // Admin
-  await db.collection(COLLECTIONS.admins).insertOne({ id: uuid(), email: ADMIN_SEED.email, name: ADMIN_SEED.name, role: ADMIN_SEED.role, passwordHash: hashPassword(ADMIN_SEED.password), createdAt: now });
-  await db.collection(COLLECTIONS.settings).updateOne({ key: 'seeded' }, { $set: { key: 'seeded', value: true, seededAt: now } }, { upsert: true });
+  await client.from('testimonials').insert(TESTIMONIALS);
+
+  // Admin (only if not exists)
+  const { data: adminExists } = await client.from('admins').select('id').eq('email', ADMIN_SEED.email).maybeSingle();
+  if (!adminExists) {
+    await client.from('admins').insert({
+      email: ADMIN_SEED.email, name: ADMIN_SEED.name, role: ADMIN_SEED.role,
+      password_hash: hashPassword(ADMIN_SEED.password),
+    });
+  }
+
+  await client.from('settings').upsert({ key: 'seeded', value: true, updated_at: new Date().toISOString() }, { onConflict: 'key' });
 }
 
 function genOrderId() {
   const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const rand = Math.floor(1000 + Math.random() * 9000);
-  return `JC${y}${m}${day}${rand}`;
+  return `JC${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}${Math.floor(1000 + Math.random() * 9000)}`;
 }
 
 function requireAdmin(request) {
@@ -44,27 +62,29 @@ function requireAdmin(request) {
 }
 
 async function handle(request, path, method) {
+  const client = sb();
   await ensureSeed();
-  const db = await getDb();
   const url = new URL(request.url);
   const seg = path;
 
-  // ==== PUBLIC ROUTES ====
-  if (seg[0] === 'health') return json({ ok: true, service: 'jeevikaa' });
+  if (seg[0] === 'health') return json({ ok: true, service: 'jeevikaa', db: 'supabase' });
 
+  // ============= CATEGORIES =============
   if (seg[0] === 'categories') {
     if (method === 'GET') {
-      const cats = await db.collection(COLLECTIONS.categories).find({ status: 'active' }).sort({ displayOrder: 1, name: 1 }).toArray();
-      return json({ categories: cats.map(c => ({ ...c, _id: undefined })) });
+      const { data, error } = await client.from('categories').select('*').eq('status', 'active').order('display_order').order('name');
+      if (error) return err(error.message, 500);
+      return json({ categories: fromRow(data) });
     }
     if (method === 'POST' && requireAdmin(request)) {
       const body = await request.json();
-      const doc = { id: uuid(), ...body, status: body.status || 'active', createdAt: new Date() };
-      await db.collection(COLLECTIONS.categories).insertOne(doc);
-      return json({ category: { ...doc, _id: undefined } });
+      const { data, error } = await client.from('categories').insert(toRow({ ...body, status: body.status || 'active' })).select().single();
+      if (error) return err(error.message);
+      return json({ category: fromRow(data) });
     }
   }
 
+  // ============= PRODUCTS =============
   if (seg[0] === 'products') {
     if (method === 'GET' && !seg[1]) {
       const q = url.searchParams.get('q');
@@ -72,100 +92,119 @@ async function handle(request, path, method) {
       const filter = url.searchParams.get('filter');
       const sort = url.searchParams.get('sort') || 'newest';
       const limit = parseInt(url.searchParams.get('limit') || '100');
-      const query = { status: 'active' };
-      if (category) query.category = category;
-      if (q) query.$or = [{ name: { $regex: q, $options: 'i' } }, { tags: { $in: [new RegExp(q, 'i')] } }, { description: { $regex: q, $options: 'i' } }];
-      if (filter === 'trending') query.trending = true;
-      if (filter === 'new') query.newArrival = true;
-      if (filter === 'bestseller') query.bestSeller = true;
-      if (filter === 'hotdeal') query.hotDeal = true;
-      const sortMap = { newest: { createdAt: -1 }, oldest: { createdAt: 1 }, priceAsc: { discountPrice: 1 }, priceDesc: { discountPrice: -1 }, popular: { reviewCount: -1 } };
-      const products = await db.collection(COLLECTIONS.products).find(query).sort(sortMap[sort] || sortMap.newest).limit(limit).toArray();
-      return json({ products: products.map(p => ({ ...p, _id: undefined })) });
+      let qb = client.from('products').select('*').eq('status', 'active');
+      if (category) qb = qb.eq('category', category);
+      if (filter === 'trending') qb = qb.eq('trending', true);
+      if (filter === 'new') qb = qb.eq('new_arrival', true);
+      if (filter === 'bestseller') qb = qb.eq('best_seller', true);
+      if (filter === 'hotdeal') qb = qb.eq('hot_deal', true);
+      if (q) qb = qb.or(`name.ilike.%${q}%,description.ilike.%${q}%`);
+      const sortMap = {
+        newest: ['created_at', false],
+        oldest: ['created_at', true],
+        priceAsc: ['discount_price', true],
+        priceDesc: ['discount_price', false],
+        popular: ['review_count', false],
+      };
+      const [col, asc] = sortMap[sort] || sortMap.newest;
+      qb = qb.order(col, { ascending: asc }).limit(limit);
+      const { data, error } = await qb;
+      if (error) return err(error.message, 500);
+      return json({ products: fromRow(data) });
     }
     if (method === 'GET' && seg[1]) {
-      const p = await db.collection(COLLECTIONS.products).findOne({ $or: [{ slug: seg[1] }, { id: seg[1] }] });
+      const { data: p } = await client.from('products').select('*').or(`slug.eq.${seg[1]},id.eq.${seg[1].match(/^[0-9a-f-]{36}$/) ? seg[1] : '00000000-0000-0000-0000-000000000000'}`).maybeSingle();
       if (!p) return err('Not found', 404);
-      const related = await db.collection(COLLECTIONS.products).find({ category: p.category, id: { $ne: p.id } }).limit(4).toArray();
-      return json({ product: { ...p, _id: undefined }, related: related.map(r => ({ ...r, _id: undefined })) });
+      const { data: rel } = await client.from('products').select('*').eq('category', p.category).neq('id', p.id).limit(4);
+      return json({ product: fromRow(p), related: fromRow(rel || []) });
     }
     if (method === 'POST' && requireAdmin(request)) {
       const body = await request.json();
-      const doc = { id: uuid(), ...body, status: body.status || 'active', createdAt: new Date() };
-      if (doc.price && doc.discountPrice) doc.offerPercentage = Math.round(((doc.price - doc.discountPrice) / doc.price) * 100);
-      await db.collection(COLLECTIONS.products).insertOne(doc);
-      return json({ product: { ...doc, _id: undefined } });
+      const row = toRow(body);
+      if (row.price && row.discount_price) row.offer_percentage = Math.round(((row.price - row.discount_price) / row.price) * 100);
+      row.status = row.status || 'active';
+      const { data, error } = await client.from('products').insert(row).select().single();
+      if (error) return err(error.message);
+      return json({ product: fromRow(data) });
     }
     if (method === 'PUT' && seg[1] && requireAdmin(request)) {
       const body = await request.json();
-      delete body._id; delete body.id;
-      if (body.price && body.discountPrice) body.offerPercentage = Math.round(((body.price - body.discountPrice) / body.price) * 100);
-      await db.collection(COLLECTIONS.products).updateOne({ id: seg[1] }, { $set: { ...body, updatedAt: new Date() } });
+      const row = toRow(body);
+      if (row.price && row.discount_price) row.offer_percentage = Math.round(((row.price - row.discount_price) / row.price) * 100);
+      row.updated_at = new Date().toISOString();
+      const { error } = await client.from('products').update(row).eq('id', seg[1]);
+      if (error) return err(error.message);
       return json({ ok: true });
     }
     if (method === 'DELETE' && seg[1] && requireAdmin(request)) {
-      await db.collection(COLLECTIONS.products).deleteOne({ id: seg[1] });
+      const { error } = await client.from('products').delete().eq('id', seg[1]);
+      if (error) return err(error.message);
       return json({ ok: true });
     }
   }
 
+  // ============= TESTIMONIALS =============
   if (seg[0] === 'testimonials' && method === 'GET') {
-    const list = await db.collection(COLLECTIONS.testimonials).find().limit(20).toArray();
-    return json({ testimonials: list.map(t => ({ ...t, _id: undefined })) });
+    const { data } = await client.from('testimonials').select('*').limit(20);
+    return json({ testimonials: fromRow(data || []) });
   }
 
+  // ============= ORDERS =============
   if (seg[0] === 'orders') {
     if (method === 'POST' && !seg[1]) {
       const body = await request.json();
       const orderId = genOrderId();
-      const now = new Date();
       const subtotal = body.items.reduce((s, i) => s + i.price * i.qty, 0);
       const shipping = subtotal >= 2999 ? 0 : 149;
       const total = subtotal + shipping - (body.discount || 0);
-      const order = {
-        id: uuid(), orderId,
+      const isQr = body.paymentMethod === 'qr';
+      const status = isQr ? 'payment_pending' : 'placed';
+      const row = {
+        order_id: orderId,
         customer: body.customer,
         items: body.items,
         subtotal, shipping, discount: body.discount || 0, total,
-        paymentMethod: body.paymentMethod,
-        utrNumber: body.utrNumber || null,
-        status: body.paymentMethod === 'qr' ? 'payment_pending' : 'placed',
-        paymentStatus: body.paymentMethod === 'qr' ? 'pending_verification' : 'cod',
-        statusHistory: [{ status: body.paymentMethod === 'qr' ? 'payment_pending' : 'placed', at: now }],
-        createdAt: now,
+        payment_method: body.paymentMethod,
+        utr_number: body.utrNumber || null,
+        status,
+        payment_status: isQr ? 'pending_verification' : 'cod',
+        status_history: [{ status, at: new Date().toISOString() }],
       };
-      await db.collection(COLLECTIONS.orders).insertOne(order);
-      // Send email (mocked until Gmail SMTP is set up)
+      const { data, error } = await client.from('orders').insert(row).select().single();
+      if (error) return err(error.message, 500);
+      const order = fromRow(data);
       try { await sendEmail({ to: body.customer.email, subject: `Order ${orderId} received — Jeevikaa Couture`, html: orderPlacedEmail(order) }); } catch (e) { console.error(e); }
-      return json({ order: { ...order, _id: undefined } });
+      return json({ order });
     }
     if (method === 'GET' && seg[1] === 'track' && seg[2]) {
-      const order = await db.collection(COLLECTIONS.orders).findOne({ orderId: seg[2] });
-      if (!order) return err('Order not found', 404);
-      return json({ order: { ...order, _id: undefined } });
+      const { data } = await client.from('orders').select('*').eq('order_id', seg[2]).maybeSingle();
+      if (!data) return err('Order not found', 404);
+      return json({ order: fromRow(data) });
     }
     if (method === 'GET' && !seg[1] && requireAdmin(request)) {
-      const list = await db.collection(COLLECTIONS.orders).find().sort({ createdAt: -1 }).limit(500).toArray();
-      return json({ orders: list.map(o => ({ ...o, _id: undefined })) });
+      const { data } = await client.from('orders').select('*').order('created_at', { ascending: false }).limit(500);
+      return json({ orders: fromRow(data || []) });
     }
     if (method === 'PATCH' && seg[1] && requireAdmin(request)) {
       const body = await request.json();
-      const order = await db.collection(COLLECTIONS.orders).findOne({ id: seg[1] });
-      if (!order) return err('Not found', 404);
-      const history = order.statusHistory || [];
-      history.push({ status: body.status, at: new Date(), note: body.note });
-      const update = { status: body.status, statusHistory: history, updatedAt: new Date() };
-      if (body.paymentStatus) update.paymentStatus = body.paymentStatus;
-      await db.collection(COLLECTIONS.orders).updateOne({ id: seg[1] }, { $set: update });
+      const { data: existing } = await client.from('orders').select('status_history').eq('id', seg[1]).maybeSingle();
+      if (!existing) return err('Not found', 404);
+      const history = existing.status_history || [];
+      history.push({ status: body.status, at: new Date().toISOString(), note: body.note });
+      const update = { status: body.status, status_history: history, updated_at: new Date().toISOString() };
+      if (body.paymentStatus) update.payment_status = body.paymentStatus;
+      const { error } = await client.from('orders').update(update).eq('id', seg[1]);
+      if (error) return err(error.message);
       return json({ ok: true });
     }
   }
 
+  // ============= ADMIN =============
   if (seg[0] === 'admin') {
     if (seg[1] === 'login' && method === 'POST') {
       const { email, password } = await request.json();
-      const admin = await db.collection(COLLECTIONS.admins).findOne({ email });
-      if (!admin || !verifyPassword(password, admin.passwordHash)) return err('Invalid credentials', 401);
+      const { data: admin } = await client.from('admins').select('*').eq('email', email).maybeSingle();
+      if (!admin || !verifyPassword(password, admin.password_hash)) return err('Invalid credentials', 401);
       const token = signToken({ id: admin.id, email: admin.email, role: 'admin', name: admin.name });
       return json({ token, admin: { id: admin.id, email: admin.email, name: admin.name, role: admin.role } });
     }
@@ -175,31 +214,33 @@ async function handle(request, path, method) {
       return json({ admin: p });
     }
     if (seg[1] === 'stats' && method === 'GET' && requireAdmin(request)) {
-      const orders = await db.collection(COLLECTIONS.orders).find().toArray();
+      const { data: orders } = await client.from('orders').select('total, status, created_at');
       const today = new Date(); today.setHours(0, 0, 0, 0);
-      const todaysOrders = orders.filter(o => new Date(o.createdAt) >= today);
-      const totalRevenue = orders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + o.total, 0);
-      const todaysRevenue = todaysOrders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + o.total, 0);
-      const pending = orders.filter(o => ['placed','payment_pending','confirmed','processing','packed'].includes(o.status)).length;
-      const delivered = orders.filter(o => o.status === 'delivered').length;
-      const productCount = await db.collection(COLLECTIONS.products).countDocuments();
-      const categoryCount = await db.collection(COLLECTIONS.categories).countDocuments();
-      return json({ stats: { totalOrders: orders.length, todaysOrders: todaysOrders.length, totalRevenue, todaysRevenue, pending, delivered, productCount, categoryCount } });
+      const list = orders || [];
+      const todaysOrders = list.filter(o => new Date(o.created_at) >= today);
+      const totalRevenue = list.filter(o => o.status !== 'cancelled').reduce((s, o) => s + (o.total || 0), 0);
+      const todaysRevenue = todaysOrders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + (o.total || 0), 0);
+      const pending = list.filter(o => ['placed','payment_pending','confirmed','processing','packed'].includes(o.status)).length;
+      const delivered = list.filter(o => o.status === 'delivered').length;
+      const { count: productCount } = await client.from('products').select('id', { count: 'exact', head: true });
+      const { count: categoryCount } = await client.from('categories').select('id', { count: 'exact', head: true });
+      return json({ stats: { totalOrders: list.length, todaysOrders: todaysOrders.length, totalRevenue, todaysRevenue, pending, delivered, productCount: productCount || 0, categoryCount: categoryCount || 0 } });
     }
   }
 
+  // ============= NEWSLETTER =============
   if (seg[0] === 'newsletter' && method === 'POST') {
     const { email } = await request.json();
     if (!email) return err('Email required');
-    await db.collection(COLLECTIONS.newsletter).updateOne({ email }, { $set: { email, createdAt: new Date() } }, { upsert: true });
+    await client.from('newsletter').upsert({ email }, { onConflict: 'email' });
     return json({ ok: true });
   }
 
   return err('Not found', 404);
 }
 
-export async function GET(request, { params }) { const p = (await params).path || []; try { return await handle(request, p, 'GET'); } catch (e) { console.error(e); return err(e.message, 500); } }
-export async function POST(request, { params }) { const p = (await params).path || []; try { return await handle(request, p, 'POST'); } catch (e) { console.error(e); return err(e.message, 500); } }
-export async function PUT(request, { params }) { const p = (await params).path || []; try { return await handle(request, p, 'PUT'); } catch (e) { console.error(e); return err(e.message, 500); } }
-export async function PATCH(request, { params }) { const p = (await params).path || []; try { return await handle(request, p, 'PATCH'); } catch (e) { console.error(e); return err(e.message, 500); } }
-export async function DELETE(request, { params }) { const p = (await params).path || []; try { return await handle(request, p, 'DELETE'); } catch (e) { console.error(e); return err(e.message, 500); } }
+export async function GET(request, { params }) { const p = (await params).path || []; try { return await handle(request, p, 'GET'); } catch (e) { console.error('API error', e); return err(e.message, 500); } }
+export async function POST(request, { params }) { const p = (await params).path || []; try { return await handle(request, p, 'POST'); } catch (e) { console.error('API error', e); return err(e.message, 500); } }
+export async function PUT(request, { params }) { const p = (await params).path || []; try { return await handle(request, p, 'PUT'); } catch (e) { console.error('API error', e); return err(e.message, 500); } }
+export async function PATCH(request, { params }) { const p = (await params).path || []; try { return await handle(request, p, 'PATCH'); } catch (e) { console.error('API error', e); return err(e.message, 500); } }
+export async function DELETE(request, { params }) { const p = (await params).path || []; try { return await handle(request, p, 'DELETE'); } catch (e) { console.error('API error', e); return err(e.message, 500); } }
