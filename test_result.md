@@ -285,6 +285,8 @@ test_plan:
   test_priority: "high_first"
 
 agent_communication:
+  - agent: "testing"
+    message: "All 37 backend tests passed (100%). Endpoints verified: auto-seed, categories, products list/detail with all filters + sorts, testimonials, order placement (COD + QR with UTR + JC-prefixed orderId + shipping math), order tracking (valid + invalid), admin login (correct + wrong password 401), admin stats, admin product CRUD (create with offerPercentage compute, update, delete), admin order status updates with statusHistory, newsletter (upsert + validation). Email is intentionally mocked (console logs) until Gmail SMTP creds arrive - expected."
   - agent: "main"
     message: |
       Round 1 MVP complete. Backend uses MongoDB with catch-all Next.js API route at /api/[[...path]].
