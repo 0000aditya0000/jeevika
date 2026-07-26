@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LayoutDashboard, ShoppingBag, Package, Users, Tag, LogOut, Plus, Edit, Trash2, TrendingUp, IndianRupee, Clock, CheckCircle2, Eye } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Package, Users, Tag, LogOut, Plus, Edit, Trash2, TrendingUp, IndianRupee, Clock, CheckCircle2, Eye, CreditCard, QrCode, Upload, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 
 const NAV = [
@@ -15,6 +15,7 @@ const NAV = [
   { key: 'orders', label: 'Orders', icon: ShoppingBag },
   { key: 'products', label: 'Products', icon: Package },
   { key: 'categories', label: 'Categories', icon: Tag },
+  { key: 'payment', label: 'Payment Settings', icon: CreditCard },
 ];
 
 const STATUS_OPTIONS = ['placed','payment_pending','confirmed','processing','packed','shipped','out_for_delivery','delivered','cancelled'];
@@ -36,6 +37,8 @@ export default function Dashboard() {
   const [showCatForm, setShowCatForm] = useState(false);
   const [orderSearch, setOrderSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [paymentSettings, setPaymentSettings] = useState({ upiId: '', merchantName: 'Jeevikaa Couture', phone: '', qrImageUrl: '', instructions: '' });
+  const [savingPayment, setSavingPayment] = useState(false);
 
   useEffect(() => {
     const t = localStorage.getItem('jc_admin_token');
@@ -52,7 +55,24 @@ export default function Dashboard() {
     authFetch('/api/orders').then(r => r.json()).then(d => setOrders(d.orders || []));
     fetch('/api/products?limit=500').then(r => r.json()).then(d => setProducts(d.products || []));
     fetch('/api/categories').then(r => r.json()).then(d => setCategories(d.categories || []));
+    fetch('/api/settings/payment').then(r => r.json()).then(d => { if (d.value) setPaymentSettings({ ...paymentSettings, ...d.value }); });
   }, [token]);
+
+  const savePaymentSettings = async () => {
+    setSavingPayment(true);
+    const res = await authFetch('/api/settings/payment', { method: 'PUT', body: JSON.stringify({ value: paymentSettings }) });
+    setSavingPayment(false);
+    if (res.ok) toast.success('Payment settings saved ✨');
+    else toast.error('Failed to save');
+  };
+
+  const uploadQrImage = async (file) => {
+    if (!file) return;
+    if (file.size > 500 * 1024) { toast.error('QR image should be under 500KB'); return; }
+    const reader = new FileReader();
+    reader.onload = () => setPaymentSettings(prev => ({ ...prev, qrImageUrl: reader.result }));
+    reader.readAsDataURL(file);
+  };
 
   const refresh = () => {
     authFetch('/api/admin/stats').then(r => r.json()).then(d => setStats(d.stats));
@@ -272,6 +292,72 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+        {tab === 'payment' && (
+          <div>
+            <h1 className="font-display text-3xl font-bold">Payment Settings</h1>
+            <p className="text-muted-foreground mt-1">Configure the UPI/QR details shown to customers on the checkout page.</p>
+            <div className="mt-6 grid lg:grid-cols-[1fr_380px] gap-6">
+              <div className="bg-white rounded-2xl border border-primary-100 shadow-soft p-6 space-y-4">
+                <div>
+                  <Label>Merchant / Business Name</Label>
+                  <Input value={paymentSettings.merchantName || ''} onChange={e => setPaymentSettings({ ...paymentSettings, merchantName: e.target.value })} placeholder="Jeevikaa Couture" className="mt-1" />
+                </div>
+                <div>
+                  <Label>UPI ID</Label>
+                  <Input value={paymentSettings.upiId || ''} onChange={e => setPaymentSettings({ ...paymentSettings, upiId: e.target.value })} placeholder="yourname@upi" className="mt-1 font-mono" />
+                  <div className="text-xs text-muted-foreground mt-1">Shown to customer on checkout for scanning/entering manually.</div>
+                </div>
+                <div>
+                  <Label>Business Contact Number</Label>
+                  <Input value={paymentSettings.phone || ''} onChange={e => setPaymentSettings({ ...paymentSettings, phone: e.target.value })} placeholder="+91 98765 43210" className="mt-1" />
+                  <div className="text-xs text-muted-foreground mt-1">Shown on checkout & used for payment queries.</div>
+                </div>
+                <div>
+                  <Label>QR Code Image</Label>
+                  <div className="mt-1 flex gap-2 items-start">
+                    <div className="flex-1">
+                      <Input value={paymentSettings.qrImageUrl?.startsWith('data:') ? '' : (paymentSettings.qrImageUrl || '')} onChange={e => setPaymentSettings({ ...paymentSettings, qrImageUrl: e.target.value })} placeholder="Paste QR image URL (or upload below)" className="mb-2" />
+                      <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-primary-200 hover:border-primary hover:bg-primary-50 cursor-pointer text-sm text-primary font-medium transition-colors">
+                        <Upload className="w-4 h-4" /> Upload QR from computer
+                        <input type="file" accept="image/*" onChange={e => uploadQrImage(e.target.files?.[0])} className="hidden" />
+                      </label>
+                      {paymentSettings.qrImageUrl && <button onClick={() => setPaymentSettings({ ...paymentSettings, qrImageUrl: '' })} className="ml-2 text-xs text-red-600 hover:underline">Remove QR</button>}
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-2">If no QR is set, we auto-generate one using the UPI ID above. Max 500KB.</div>
+                </div>
+                <div>
+                  <Label>Payment Instructions (optional)</Label>
+                  <Textarea rows={3} value={paymentSettings.instructions || ''} onChange={e => setPaymentSettings({ ...paymentSettings, instructions: e.target.value })} placeholder="e.g. Send screenshot to WhatsApp +91 98765 43210 after paying" className="mt-1" />
+                </div>
+                <Button size="lg" onClick={savePaymentSettings} disabled={savingPayment} className="rounded-full mt-2">{savingPayment ? 'Saving...' : 'Save Payment Settings'}</Button>
+              </div>
+
+              {/* Preview */}
+              <div className="lg:sticky lg:top-6 lg:h-fit">
+                <div className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Customer preview</div>
+                <div className="bg-gradient-to-br from-primary-50 to-white border border-primary-100 rounded-2xl p-6 shadow-soft">
+                  <div className="flex items-center gap-2 mb-4"><QrCode className="w-5 h-5 text-primary" /><div className="font-semibold">UPI / QR Payment</div></div>
+                  <div className="aspect-square bg-white rounded-xl border-2 border-dashed border-primary-200 flex items-center justify-center p-4">
+                    {paymentSettings.qrImageUrl ? (
+                      <img src={paymentSettings.qrImageUrl} alt="QR" className="w-full h-full object-contain" />
+                    ) : paymentSettings.upiId ? (
+                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=${paymentSettings.upiId}&pn=${encodeURIComponent(paymentSettings.merchantName || 'Merchant')}&cu=INR`)}`} alt="QR" className="w-full h-full object-contain" />
+                    ) : (
+                      <div className="text-xs text-muted-foreground text-center">Enter UPI ID or upload QR to preview</div>
+                    )}
+                  </div>
+                  <div className="mt-4 space-y-2 text-sm">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Merchant</span><span className="font-semibold">{paymentSettings.merchantName || '—'}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">UPI ID</span><span className="font-mono text-xs">{paymentSettings.upiId || '—'}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" /> Support</span><span className="text-xs">{paymentSettings.phone || '—'}</span></div>
+                  </div>
+                  {paymentSettings.instructions && <div className="text-xs bg-yellow-50 border border-yellow-200 p-3 rounded-lg text-yellow-900 mt-4">{paymentSettings.instructions}</div>}
+                </div>
+              </div>
             </div>
           </div>
         )}

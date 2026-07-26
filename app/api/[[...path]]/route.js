@@ -239,6 +239,20 @@ async function handle(request, path, method) {
     }
   }
 
+  // ============= SETTINGS (payment config etc) =============
+  if (seg[0] === 'settings') {
+    const key = seg[1];
+    if (method === 'GET' && key) {
+      const { data } = await client.from('settings').select('value').eq('key', key).maybeSingle();
+      return json({ key, value: data?.value || null });
+    }
+    if (method === 'PUT' && key && requireAdmin(request)) {
+      const body = await request.json();
+      await client.from('settings').upsert({ key, value: body.value ?? body, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      return json({ ok: true });
+    }
+  }
+
   // ============= NEWSLETTER =============
   if (seg[0] === 'newsletter' && method === 'POST') {
     const { email } = await request.json();

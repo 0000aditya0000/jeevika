@@ -1,12 +1,12 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/components/CartProvider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Truck, ShieldCheck, QrCode, Wallet, Check, Copy } from 'lucide-react';
+import { Truck, ShieldCheck, QrCode, Wallet, Check, Copy, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Checkout() {
@@ -16,7 +16,12 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [utrNumber, setUtrNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [payCfg, setPayCfg] = useState({ upiId: 'jeevikaacouture@upi', merchantName: 'Jeevikaa Couture', phone: '', qrImageUrl: '', instructions: '' });
   const [customer, setCustomer] = useState({ fullName: '', phone: '', email: '', address: '', city: '', state: '', pincode: '', landmark: '', altPhone: '', notes: '' });
+
+  useEffect(() => {
+    fetch('/api/settings/payment').then(r => r.json()).then(d => { if (d.value) setPayCfg(prev => ({ ...prev, ...d.value })); }).catch(() => {});
+  }, []);
 
   if (hydrated && cart.length === 0) {
     if (typeof window !== 'undefined') router.push('/cart');
@@ -95,14 +100,19 @@ export default function Checkout() {
                 <div className="mt-6 p-6 rounded-2xl bg-gradient-to-br from-primary-50 to-white border border-primary-100">
                   <div className="grid md:grid-cols-[220px_1fr] gap-6">
                     <div className="aspect-square bg-white rounded-2xl border-2 border-dashed border-primary-200 flex items-center justify-center p-4">
-                      <div className="text-center">
-                        <img alt="QR" src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=jeevikaacouture@upi%26pn=Jeevikaa%20Couture%26am=${total}%26cu=INR`} className="w-40 h-40 mx-auto" />
+                      <div className="text-center w-full h-full flex flex-col items-center justify-center">
+                        {payCfg.qrImageUrl ? (
+                          <img alt="Payment QR" src={payCfg.qrImageUrl} className="w-40 h-40 object-contain" />
+                        ) : (
+                          <img alt="Payment QR" src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=${payCfg.upiId || 'jeevikaacouture@upi'}&pn=${encodeURIComponent(payCfg.merchantName || 'Jeevikaa Couture')}&am=${total}&cu=INR`)}`} className="w-40 h-40" />
+                        )}
                         <div className="text-xs text-muted-foreground mt-2">Scan with any UPI app</div>
                       </div>
                     </div>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-muted-foreground">Merchant</span><span className="font-semibold">Jeevikaa Couture</span></div>
-                      <div className="flex justify-between items-center"><span className="text-muted-foreground">UPI ID</span><span className="font-semibold flex items-center gap-2">jeevikaacouture@upi <button onClick={() => { navigator.clipboard.writeText('jeevikaacouture@upi'); toast.success('Copied'); }}><Copy className="w-3 h-3" /></button></span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Merchant</span><span className="font-semibold">{payCfg.merchantName || 'Jeevikaa Couture'}</span></div>
+                      <div className="flex justify-between items-center"><span className="text-muted-foreground">UPI ID</span><span className="font-semibold flex items-center gap-2 font-mono text-xs">{payCfg.upiId || 'jeevikaacouture@upi'} <button onClick={() => { navigator.clipboard.writeText(payCfg.upiId || 'jeevikaacouture@upi'); toast.success('Copied'); }}><Copy className="w-3 h-3" /></button></span></div>
+                      {payCfg.phone && <div className="flex justify-between items-center"><span className="text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" /> Support</span><span className="font-semibold text-xs">{payCfg.phone}</span></div>}
                       <div className="flex justify-between"><span className="text-muted-foreground">Amount</span><span className="font-bold text-primary text-lg">₹{total.toLocaleString('en-IN')}</span></div>
                       <div className="pt-3">
                         <Label>Enter UTR / Transaction ID *</Label>
@@ -111,6 +121,9 @@ export default function Checkout() {
                       </div>
                     </div>
                   </div>
+                  {payCfg.instructions ? (
+                    <div className="mt-4 text-xs bg-blue-50 border border-blue-200 p-3 rounded-lg text-blue-900 whitespace-pre-wrap">💡 {payCfg.instructions}</div>
+                  ) : null}
                   <div className="mt-4 text-xs bg-yellow-50 border border-yellow-200 p-3 rounded-lg text-yellow-900">⚠ Your order will be confirmed after payment verification (approx. 30 mins). Confirmation email will follow.</div>
                 </div>
               )}

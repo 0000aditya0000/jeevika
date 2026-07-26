@@ -268,6 +268,20 @@ backend:
       - working: true
         agent: "testing"
         comment: "✅ VERIFIED: ChunkLoadError is fixed. GET /checkout returns 200 with valid HTML. No ChunkLoadError text found in response. Page loads successfully."
+  - task: "Admin-managed payment settings endpoints"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented GET /api/settings/{key} (public) and PUT /api/settings/{key} (admin JWT required). Server accepts body.value ?? body for flexibility. Frontend integrated in admin dashboard Payment Settings tab and customer checkout QR section."
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: All 14 tests passed (100%). GET /api/settings/{key} works for both existing and non-existing keys (returns { key, value: null } for non-existing). PUT /api/settings/payment requires admin auth (blocks without token or with invalid token, returns 404). PUT accepts both { value: {...} } wrapper and flat body formats. Saved values persist correctly. Regression tests passed: GET /api/products, POST /api/orders (COD with JC-prefixed orderId), GET /api/orders/track, POST /api/admin/login, GET /api/admin/stats all working."
 
 
 frontend:
@@ -321,7 +335,7 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 2
+  test_sequence: 3
   run_ui: false
 
 test_plan:
@@ -398,6 +412,27 @@ agent_communication:
       3) POST /api/orders for both COD and QR (with utrNumber). Verify JC-prefixed orderId.
       4) GET /api/orders/track/{orderId}
       5) POST /api/admin/login → get JWT. Then GET /api/admin/stats, /api/orders (needs Bearer).
+
+  - agent: "main"
+    message: |
+      New feature: admin-managed QR/UPI payment settings.
+      Endpoints (need testing):
+      - GET  /api/settings/{key}   (public read) — returns { key, value }. If no row, value is null.
+      - PUT  /api/settings/{key}   (admin JWT required) — upserts by key. Body can be { value: {...} } (preferred) or a flat object; server stores whatever comes in.
+      Client uses key="payment" with value shape:
+        { upiId, merchantName, phone, qrImageUrl, instructions }
+      Frontend already integrated:
+      - Admin dashboard now has "Payment Settings" tab: edit merchant name / UPI ID / phone / QR (upload file → base64 data URL OR paste URL) / instructions with live customer preview. Save button PUTs to /api/settings/payment.
+      - Customer checkout QR section reads /api/settings/payment on mount and dynamically renders merchant name, UPI ID, support phone, custom QR image (if uploaded) or auto-generated QR (if only UPI ID set), plus optional custom instructions banner.
+      Please verify:
+      1) GET /api/settings/payment → returns { key: 'payment', value: null } OR the saved value.
+      2) PUT /api/settings/payment WITH admin bearer token AND body { value: { upiId: 'test@paytm', merchantName: 'Test Store', phone: '+91 99999 88888', qrImageUrl: '', instructions: 'Send screenshot' } } → { ok: true }.
+      3) GET again → returns exactly that value object.
+      4) PUT /api/settings/payment WITHOUT auth header → returns non-2xx (404).
+      5) GET /api/settings/some-random-key → returns { key: 'some-random-key', value: null }.
+      6) PUT with a flat body { upiId: 'flat@upi' } (no "value" wrapper) → still ok:true; subsequent GET returns { upiId: 'flat@upi' } (server accepts body.value ?? body).
+      7) Regression: order flow (POST /api/orders both COD and QR), tracking, admin login, admin stats, product & category CRUD still all work.
+
       6) POST /api/products (auth), PUT, DELETE. PATCH /api/orders/{id} status update.
       Note: Nodemailer email is intentionally mocked (console log) until user provides Gmail SMTP creds.
   - agent: "testing"
