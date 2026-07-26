@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Search, Heart, ShoppingBag, User, Menu, X, ChevronDown } from 'lucide-react';
+import { Search, Heart, ShoppingBag, Menu, X, ChevronDown } from 'lucide-react';
 import { useCart } from './CartProvider';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -112,7 +112,6 @@ export default function Header() {
                 <ShoppingBag className="w-5 h-5" />
                 {cartCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-primary text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full font-bold">{cartCount}</span>}
               </Link>
-              <Link href="/admin" className="p-2 hover:bg-primary/5 rounded-full transition-colors hidden md:inline-flex" aria-label="Account"><User className="w-5 h-5" /></Link>
             </div>
           </div>
 
