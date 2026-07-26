@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 340 40% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 340 40% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 340 40% 12%;
+    --primary: 335 78% 43%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 351 100% 86%;
+    --secondary-foreground: 340 60% 15%;
+    --muted: 340 20% 96%;
+    --muted-foreground: 340 10% 45%;
+    --accent: 51 100% 50%;
+    --accent-foreground: 30 60% 15%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 340 20% 90%;
+    --input: 340 20% 90%;
+    --ring: 335 78% 43%;
+    --radius: 0.75rem;
+  }
+
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground font-sans antialiased; }
+  h1, h2, h3, h4, h5, h6 { @apply font-display tracking-tight; }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .luxury-gradient { background: linear-gradient(135deg, #C2185B 0%, #E91E63 50%, #FFB6C1 100%); }
+  .gold-gradient { background: linear-gradient(135deg, #FFD700 0%, #D4AF37 50%, #B8860B 100%); }
+  .text-gradient-luxury { background: linear-gradient(135deg, #C2185B 0%, #E91E63 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .text-gradient-gold { background: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #B8860B 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .glass { background: rgba(255,255,255,0.72); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.6); }
+  .glass-dark { background: rgba(30,10,20,0.4); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .shimmer-bg { background: linear-gradient(90deg, #f6e8ee 0%, #fbf4f7 40%, #f6e8ee 80%); background-size: 1000px 100%; }
+  .luxury-border { position: relative; }
+  .luxury-border::after { content: ''; position: absolute; left: 50%; bottom: -12px; width: 60px; height: 2px; background: linear-gradient(90deg, transparent, #D4AF37, transparent); transform: translateX(-50%); }
+}
+
+html { scroll-behavior: smooth; }
