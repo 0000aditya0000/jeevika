@@ -285,8 +285,47 @@ test_plan:
   test_priority: "high_first"
 
 agent_communication:
+  - agent: "main"
+    message: |
+      MIGRATED FROM MONGODB TO SUPABASE POSTGRESQL. User provided Supabase URL + anon + service role keys.
+      Steps done:
+      1. Added SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, JWT_SECRET to /app/.env
+      2. Installed @supabase/supabase-js@2.45.4 (2.110 needs node 22, we have 20)
+      3. Created /app/supabase/schema.sql — user ran it in Supabase SQL editor manually (confirmed).
+      4. Created /app/lib/supabase.js with sb() client + fromRow/toRow snake_case<->camelCase converters.
+      5. Fully rewrote /app/app/api/[[...path]]/route.js to use Supabase instead of MongoDB.
+         - Same endpoints, same request/response shape (all fields still camelCase to client).
+         - ensureSeed() checks settings.seeded=true and inserts categories/products/testimonials/admin.
+         - Nested JSONB fields (customer, items, colors, sizes, images, status_history) preserve camelCase inside.
+      6. Verified manually: /api/products, /api/categories, /api/testimonials all return seeded rows.
+         Admin login returns JWT successfully.
+      Please re-run the same 6 test groups you ran before, this time against Supabase. Only backend changes; frontend untouched.
   - agent: "testing"
     message: "All 37 backend tests passed (100%). Endpoints verified: auto-seed, categories, products list/detail with all filters + sorts, testimonials, order placement (COD + QR with UTR + JC-prefixed orderId + shipping math), order tracking (valid + invalid), admin login (correct + wrong password 401), admin stats, admin product CRUD (create with offerPercentage compute, update, delete), admin order status updates with statusHistory, newsletter (upsert + validation). Email is intentionally mocked (console logs) until Gmail SMTP creds arrive - expected."
+  - agent: "testing"
+    message: |
+      ✅ SUPABASE MIGRATION VERIFIED - ALL 37 TESTS PASSED (100%)
+      
+      Re-ran complete backend test suite after Supabase PostgreSQL migration. All tests that passed with MongoDB continue to pass with Supabase.
+      
+      VERIFIED SUPABASE-SPECIFIC FEATURES:
+      ✅ Data seeding: 6 categories, 8 products, 4 testimonials, 1 admin successfully seeded into Postgres
+      ✅ Snake_case ↔ camelCase conversion: All API responses maintain camelCase contract to clients
+      ✅ JSONB fields: Nested objects (customer, items, colors, sizes, images, statusHistory) preserve camelCase inside
+      ✅ Product filters: All working (category, trending, new, bestseller, hotdeal, search with ilike)
+      ✅ Product sort: All working (priceAsc, priceDesc, popular, newest)
+      ✅ Product detail: GET /api/products/rose-blush-silk-saree returns product + 1 related
+      ✅ Order placement: COD (orderId=JC202607268844, status=placed, paymentStatus=cod) and QR (orderId=JC202607263517, status=payment_pending, paymentStatus=pending_verification, utrNumber saved)
+      ✅ Shipping calculation: Free (₹0) for subtotal≥₹2,999, else ₹149
+      ✅ Order tracking: Valid orders found, invalid returns 404
+      ✅ Admin auth: Wrong password 401, correct login returns JWT
+      ✅ Admin stats: All numeric fields correct (totalOrders=2, todaysOrders=2, totalRevenue=23996, todaysRevenue=23996, pending=2, delivered=0, productCount=8, categoryCount=6)
+      ✅ Admin CRUD: Product creation with offerPercentage=30% computed correctly, update stock to 3, delete verified with 404
+      ✅ Slug uniqueness: Enforced by Postgres unique constraint
+      ✅ Admin order status: PATCH updates status + paymentStatus, statusHistory JSONB array grows correctly
+      ✅ Newsletter: Upsert on unique email constraint working, validation returns 400 for missing email
+      
+      NO ISSUES FOUND. Supabase migration is production-ready.
   - agent: "main"
     message: |
       Round 1 MVP complete. Backend uses MongoDB with catch-all Next.js API route at /api/[[...path]].
