@@ -239,6 +239,40 @@ async function handle(request, path, method) {
     }
   }
 
+  // ============= UPLOAD (Supabase Storage) =============
+  if (seg[0] === 'upload' && method === 'POST' && requireAdmin(request)) {
+    try {
+      const formData = await request.formData();
+      const file = formData.get('file');
+      if (!file || typeof file === 'string') return err('No file provided');
+      const size = file.size || 0;
+      const MAX = 3 * 1024 * 1024; // 3MB
+      if (size > MAX) return err(`File too large. Max 3MB (got ${(size/1024/1024).toFixed(1)}MB)`);
+      const type = file.type || 'application/octet-stream';
+      if (!type.startsWith('image/')) return err('Only image files allowed');
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const rawName = (file.name || 'image').replace(/[^a-zA-Z0-9._-]/g, '-');
+      const ext = (rawName.split('.').pop() || 'jpg').toLowerCase();
+      const key = `products/${Date.now()}-${uuid().slice(0, 8)}.${ext}`;
+
+      // Ensure the "media" bucket exists (public read).
+      try {
+        const { data: buckets } = await client.storage.listBuckets();
+        if (!buckets?.find(b => b.name === 'media')) {
+          await client.storage.createBucket('media', { public: true, fileSizeLimit: MAX });
+        }
+      } catch (_) {}
+
+      const { error: upErr } = await client.storage.from('media').upload(key, bytes, { contentType: type, upsert: false });
+      if (upErr) return err(`Upload failed: ${upErr.message}`, 500);
+      const { data: pub } = client.storage.from('media').getPublicUrl(key);
+      return json({ url: pub.publicUrl, key, size, type });
+    } catch (e) {
+      console.error('Upload error', e);
+      return err(e.message || 'Upload failed', 500);
+    }
+  }
+
   // ============= SETTINGS (payment config etc) =============
   if (seg[0] === 'settings') {
     const key = seg[1];

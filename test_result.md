@@ -448,6 +448,42 @@ agent_communication:
       - All filters working (category, trending, new, bestseller, hotdeal, search)
       - All sort options working (priceAsc, priceDesc, popular, newest)
       - Product detail with related products (≤4) working
+
+  - agent: "main"
+    message: |
+      New feature + bug fix round.
+
+      1) NEW ENDPOINT: POST /api/upload (admin JWT required, multipart/form-data with "file" field).
+         - Uploads to Supabase Storage bucket "media" (auto-creates the bucket on first use, public read).
+         - Validates image mime + max size 3 MB. Rejects non-images with 400 "Only image files allowed".
+         - Returns { url, key, size, type }. The `url` is a Supabase public URL.
+         - Auth guard: without Bearer token returns 404 (path not matched).
+
+      2) FIX (frontend only): Admin product form was clobbering commas typed into the Sizes / Colors inputs.
+         Root cause: input value was rebuilt each keystroke via `array.join(', ')`, and filter(Boolean) stripped
+         the trailing empty item so users couldn't type multiple entries.
+         Fix: introduced separate `sizesText` / `colorsText` string state that stores the raw text as typed;
+         parsed to arrays only at save time inside `saveProduct`. Also added a live color-swatch preview.
+
+      3) FIX/UX (frontend only): Admin product form now has a drag-drop image uploader (instead of a URL
+         textarea). Multi-file. Shows "800×1000 px, JPG/PNG/WebP, max 3 MB" guidance. Live thumbnail grid
+         with hover "Set as thumbnail" ⭐ and "Remove" actions. Uses the new /api/upload endpoint.
+
+      Please test:
+      A) POST /api/upload:
+         - Without auth → 404 (not authorised).
+         - With admin bearer token + a small valid PNG (multipart) → 200 with `{ url, key, size, type }`.
+           The returned URL must be reachable via HTTP GET returning 200 (public bucket).
+         - With admin bearer token + a >3 MB file (multipart, image/jpeg) → 400 with
+           `{ error: "File too large. Max 3MB (got X.XMB)" }`.
+         - With admin bearer token + a text/plain file → 400 with `{ error: "Only image files allowed" }`.
+         - With admin bearer token + no file → 400 with `{ error: "No file provided" }`.
+      B) Regression on the endpoints most likely affected by /api/upload sharing the same handler:
+         - POST /api/admin/login still returns token.
+         - GET /api/products, GET /api/categories, POST /api/orders, GET /api/orders/track/{orderId} still work.
+      Do NOT run the full 37-test suite — just the new /api/upload cases + a light regression.
+      Note: the comma-input & uploader UI fixes are frontend-only and don't need backend testing.
+
       - Testimonials API returns 4 testimonials
       
       ✅ ORDER FLOW (5 tests):

@@ -39,6 +39,17 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentSettings, setPaymentSettings] = useState({ upiId: '', merchantName: 'Jeevikaa Couture', phone: '', qrImageUrl: '', instructions: '' });
   const [savingPayment, setSavingPayment] = useState(false);
+  const [sizesText, setSizesText] = useState('');
+  const [colorsText, setColorsText] = useState('');
+  const [uploadingImages, setUploadingImages] = useState(false);
+
+  // When product form opens, seed the text-buffer inputs so users can type commas freely.
+  useEffect(() => {
+    if (productEdit) {
+      setSizesText((productEdit.sizes || []).join(', '));
+      setColorsText((productEdit.colors || []).join(', '));
+    }
+  }, [productEdit?.id, showProdForm]);
 
   useEffect(() => {
     const t = localStorage.getItem('jc_admin_token');
@@ -90,12 +101,49 @@ export default function Dashboard() {
   };
 
   const saveProduct = async (prod) => {
-    const url = prod.id ? `/api/products/${prod.id}` : '/api/products';
-    const method = prod.id ? 'PUT' : 'POST';
-    const res = await authFetch(url, { method, body: JSON.stringify(prod) });
-    if (res.ok) { toast.success(prod.id ? 'Product updated' : 'Product added'); refresh(); setShowProdForm(false); setProductEdit(null); }
+    const payload = {
+      ...prod,
+      sizes: sizesText.split(',').map(x => x.trim()).filter(Boolean),
+      colors: colorsText.split(',').map(x => x.trim()).filter(Boolean),
+    };
+    const url = payload.id ? `/api/products/${payload.id}` : '/api/products';
+    const method = payload.id ? 'PUT' : 'POST';
+    const res = await authFetch(url, { method, body: JSON.stringify(payload) });
+    if (res.ok) { toast.success(payload.id ? 'Product updated' : 'Product added'); refresh(); setShowProdForm(false); setProductEdit(null); }
     else toast.error('Failed');
   };
+
+  const uploadProductImages = async (files) => {
+    if (!files || files.length === 0) return;
+    setUploadingImages(true);
+    const uploaded = [];
+    for (const file of Array.from(files)) {
+      if (file.size > 3 * 1024 * 1024) { toast.error(`${file.name}: too large (max 3MB)`); continue; }
+      if (!file.type.startsWith('image/')) { toast.error(`${file.name}: not an image`); continue; }
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: fd });
+        const data = await res.json();
+        if (data.url) uploaded.push(data.url);
+        else toast.error(`${file.name}: ${data.error || 'upload failed'}`);
+      } catch (e) { toast.error(`${file.name}: network error`); }
+    }
+    if (uploaded.length > 0) {
+      const newImages = [...(productEdit?.images || []), ...uploaded];
+      setProductEdit(prev => ({ ...prev, images: newImages, thumbnail: prev?.thumbnail || newImages[0] }));
+      toast.success(`Uploaded ${uploaded.length} image${uploaded.length > 1 ? 's' : ''} ✨`);
+    }
+    setUploadingImages(false);
+  };
+
+  const removeProductImage = (idx) => {
+    const removed = productEdit.images[idx];
+    const newImages = productEdit.images.filter((_, i) => i !== idx);
+    setProductEdit({ ...productEdit, images: newImages, thumbnail: productEdit.thumbnail === removed ? (newImages[0] || '') : productEdit.thumbnail });
+  };
+
+  const setProductThumbnail = (url) => setProductEdit({ ...productEdit, thumbnail: url });
 
   const deleteProduct = async (id) => {
     if (!confirm('Delete this product?')) return;
@@ -472,9 +520,52 @@ export default function Dashboard() {
               <div><Label>Material</Label><Input value={productEdit.material} onChange={e => setProductEdit({ ...productEdit, material: e.target.value })} /></div>
               <div className="col-span-2"><Label>Short Description</Label><Input value={productEdit.shortDescription} onChange={e => setProductEdit({ ...productEdit, shortDescription: e.target.value })} /></div>
               <div className="col-span-2"><Label>Description</Label><Textarea rows={3} value={productEdit.description} onChange={e => setProductEdit({ ...productEdit, description: e.target.value })} /></div>
-              <div className="col-span-2"><Label>Image URLs (comma separated)</Label><Textarea rows={2} value={(productEdit.images || []).join(', ')} onChange={e => { const imgs = e.target.value.split(',').map(x => x.trim()).filter(Boolean); setProductEdit({ ...productEdit, images: imgs, thumbnail: imgs[0] || productEdit.thumbnail }); }} /></div>
-              <div><Label>Sizes (comma)</Label><Input value={(productEdit.sizes || []).join(', ')} onChange={e => setProductEdit({ ...productEdit, sizes: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })} /></div>
-              <div><Label>Colors (hex, comma)</Label><Input value={(productEdit.colors || []).join(', ')} onChange={e => setProductEdit({ ...productEdit, colors: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })} /></div>
+
+              {/* Product Images uploader */}
+              <div className="col-span-2">
+                <Label>Product Images</Label>
+                <div className="text-xs text-muted-foreground mt-0.5 mb-2">
+                  📐 Recommended: <b>800 × 1000px</b> (3:4 portrait ratio) • <b>JPG or PNG</b> • Max <b>3 MB</b> per image • Upload up to <b>8 images</b>. First image becomes the thumbnail (or click the ⭐ on any image to set it).
+                </div>
+                <label className={`block border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-colors ${uploadingImages ? 'border-primary bg-primary-50' : 'border-primary-200 hover:border-primary hover:bg-primary-50/50'}`}>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e => { uploadProductImages(e.target.files); e.target.value = ''; }} className="hidden" disabled={uploadingImages} />
+                  <Upload className="w-8 h-8 text-primary mx-auto mb-2" />
+                  <div className="font-semibold text-primary">{uploadingImages ? 'Uploading…' : 'Click to upload images'}</div>
+                  <div className="text-xs text-muted-foreground mt-1">JPG, PNG or WebP • Max 3 MB each • Multiple files supported</div>
+                </label>
+                {productEdit.images?.length > 0 && (
+                  <div className="grid grid-cols-4 gap-3 mt-3">
+                    {productEdit.images.map((img, idx) => (
+                      <div key={idx} className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 ${productEdit.thumbnail === img ? 'border-primary ring-2 ring-primary/30' : 'border-input'}`}>
+                        <img src={img} className="w-full h-full object-cover" alt="" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                          <button type="button" onClick={() => setProductThumbnail(img)} title="Set as thumbnail" className="text-xs bg-white px-2 py-1 rounded-full text-primary font-semibold flex items-center gap-1">
+                            {productEdit.thumbnail === img ? '⭐ Thumbnail' : 'Set as thumbnail'}
+                          </button>
+                          <button type="button" onClick={() => removeProductImage(idx)} title="Remove" className="text-xs bg-red-500 text-white px-2 py-1 rounded-full flex items-center gap-1"><Trash2 className="w-3 h-3" /> Remove</button>
+                        </div>
+                        {productEdit.thumbnail === img && <div className="absolute top-1 left-1 bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">⭐</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div><Label>Sizes</Label>
+                <Input value={sizesText} onChange={e => setSizesText(e.target.value)} placeholder="e.g. XS, S, M, L, XL" />
+                <div className="text-[10px] text-muted-foreground mt-1">Separate multiple sizes with commas.</div>
+              </div>
+              <div><Label>Colors</Label>
+                <Input value={colorsText} onChange={e => setColorsText(e.target.value)} placeholder="e.g. #C2185B, #FFD700, #FFB6C1" />
+                <div className="text-[10px] text-muted-foreground mt-1">Hex color codes, separated by commas.</div>
+                {colorsText.trim() && (
+                  <div className="flex gap-1 mt-2">
+                    {colorsText.split(',').map(x => x.trim()).filter(Boolean).map((c, i) => (
+                      <span key={i} className="w-6 h-6 rounded-full border-2 border-white ring-1 ring-black/10" style={{ background: c }} title={c} />
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="col-span-2 flex flex-wrap gap-3">
                 {['trending','featured','bestSeller','newArrival','hotDeal'].map(k => (
                   <label key={k} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!productEdit[k]} onChange={e => setProductEdit({ ...productEdit, [k]: e.target.checked })} /> {k}</label>
