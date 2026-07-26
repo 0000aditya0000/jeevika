@@ -32,6 +32,10 @@ export default function Dashboard() {
   const [orderView, setOrderView] = useState(null);
   const [productEdit, setProductEdit] = useState(null);
   const [showProdForm, setShowProdForm] = useState(false);
+  const [categoryEdit, setCategoryEdit] = useState(null);
+  const [showCatForm, setShowCatForm] = useState(false);
+  const [orderSearch, setOrderSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     const t = localStorage.getItem('jc_admin_token');
@@ -78,6 +82,30 @@ export default function Dashboard() {
     await authFetch(`/api/products/${id}`, { method: 'DELETE' });
     toast.success('Deleted'); refresh();
   };
+
+  const saveCategory = async (cat) => {
+    const url = cat.id ? `/api/categories/${cat.id}` : '/api/categories';
+    const method = cat.id ? 'PUT' : 'POST';
+    const res = await authFetch(url, { method, body: JSON.stringify(cat) });
+    if (res.ok) { toast.success(cat.id ? 'Category updated' : 'Category added'); fetch('/api/categories').then(r => r.json()).then(d => setCategories(d.categories || [])); setShowCatForm(false); setCategoryEdit(null); }
+    else toast.error('Failed');
+  };
+
+  const deleteCategory = async (id) => {
+    if (!confirm('Delete this category?')) return;
+    await authFetch(`/api/categories/${id}`, { method: 'DELETE' });
+    toast.success('Deleted');
+    fetch('/api/categories').then(r => r.json()).then(d => setCategories(d.categories || []));
+  };
+
+  const filteredOrders = orders.filter(o => {
+    if (statusFilter !== 'all' && o.status !== statusFilter) return false;
+    if (orderSearch) {
+      const q = orderSearch.toLowerCase();
+      return o.orderId.toLowerCase().includes(q) || o.customer.fullName.toLowerCase().includes(q) || o.customer.phone?.includes(q) || o.customer.email?.toLowerCase().includes(q);
+    }
+    return true;
+  });
 
   if (!token) return null;
 
@@ -155,23 +183,38 @@ export default function Dashboard() {
         {tab === 'orders' && (
           <div>
             <h1 className="font-display text-3xl font-bold">Orders</h1>
-            <p className="text-muted-foreground mt-1">{orders.length} total orders</p>
+            <p className="text-muted-foreground mt-1">{filteredOrders.length} of {orders.length} orders</p>
+            <div className="mt-4 flex flex-wrap gap-2 items-center">
+              <div className="flex-1 min-w-[240px]">
+                <Input placeholder="Search by Order ID (e.g. JC202607260001), name, phone, or email…" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} className="h-10 rounded-full" />
+              </div>
+              <div className="w-48">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-10 rounded-full"><SelectValue placeholder="All statuses" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s.replace(/_/g,' ')}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {(orderSearch || statusFilter !== 'all') && <Button size="sm" variant="outline" onClick={() => { setOrderSearch(''); setStatusFilter('all'); }} className="rounded-full">Clear</Button>}
+            </div>
             <div className="mt-6 bg-white rounded-2xl border border-primary-100 shadow-soft overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-primary-50/40 text-left"><tr><th className="px-4 py-3 font-semibold">Order</th><th className="px-4 py-3 font-semibold">Customer</th><th className="px-4 py-3 font-semibold">Amount</th><th className="px-4 py-3 font-semibold">Payment</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3"></th></tr></thead>
                   <tbody>
-                    {orders.map(o => (
-                      <tr key={o.id} className="border-t border-primary-100/50">
+                    {filteredOrders.map(o => (
+                      <tr key={o.id} className="border-t border-primary-100/50 hover:bg-primary-50/30 cursor-pointer" onClick={() => setOrderView(o)}>
                         <td className="px-4 py-3"><div className="font-mono text-xs">{o.orderId}</div><div className="text-xs text-muted-foreground">{new Date(o.createdAt).toLocaleString('en-IN')}</div></td>
                         <td className="px-4 py-3"><div className="font-medium">{o.customer.fullName}</div><div className="text-xs text-muted-foreground">{o.customer.phone}</div></td>
                         <td className="px-4 py-3 font-semibold text-primary">₹{o.total.toLocaleString('en-IN')}</td>
                         <td className="px-4 py-3"><span className="text-xs uppercase font-semibold">{o.paymentMethod}</span>{o.utrNumber && <div className="text-[10px] text-muted-foreground">UTR: {o.utrNumber}</div>}</td>
                         <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[o.status]}`}>{o.status.replace(/_/g,' ')}</span></td>
-                        <td className="px-4 py-3"><Button size="sm" variant="outline" onClick={() => setOrderView(o)}><Eye className="w-3.5 h-3.5" /></Button></td>
+                        <td className="px-4 py-3"><Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setOrderView(o); }}><Eye className="w-3.5 h-3.5" /></Button></td>
                       </tr>
                     ))}
-                    {orders.length === 0 && <tr><td colSpan="6" className="text-center py-10 text-muted-foreground">No orders yet</td></tr>}
+                    {filteredOrders.length === 0 && <tr><td colSpan="6" className="text-center py-10 text-muted-foreground">{orderSearch || statusFilter !== 'all' ? 'No orders match your search' : 'No orders yet'}</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -207,14 +250,24 @@ export default function Dashboard() {
 
         {tab === 'categories' && (
           <div>
-            <h1 className="font-display text-3xl font-bold">Categories</h1>
+            <div className="flex justify-between items-center">
+              <div><h1 className="font-display text-3xl font-bold">Categories</h1><p className="text-muted-foreground mt-1">{categories.length} categories</p></div>
+              <Button onClick={() => { setCategoryEdit({ name: '', slug: '', description: '', banner: '', thumbnail: '', status: 'active', displayOrder: 0 }); setShowCatForm(true); }} className="rounded-full"><Plus className="w-4 h-4 mr-1" /> Add Category</Button>
+            </div>
             <div className="mt-6 grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {categories.map(c => (
-                <div key={c.id} className="bg-white rounded-2xl border border-primary-100 shadow-soft overflow-hidden">
-                  <img src={c.thumbnail} className="w-full h-32 object-cover" alt="" />
+                <div key={c.id} className="bg-white rounded-2xl border border-primary-100 shadow-soft overflow-hidden group">
+                  <div className="relative">
+                    <img src={c.thumbnail} className="w-full h-32 object-cover" alt="" />
+                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button size="sm" variant="secondary" className="h-8 w-8 p-0" onClick={() => { setCategoryEdit(c); setShowCatForm(true); }}><Edit className="w-3.5 h-3.5" /></Button>
+                      <Button size="sm" variant="secondary" className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600" onClick={() => deleteCategory(c.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                    </div>
+                  </div>
                   <div className="p-4">
                     <div className="font-display font-bold text-lg">{c.name}</div>
-                    <div className="text-sm text-muted-foreground line-clamp-2">{c.description}</div>
+                    <div className="text-xs text-muted-foreground font-mono">/{c.slug}</div>
+                    <div className="text-sm text-muted-foreground line-clamp-2 mt-1">{c.description}</div>
                     <div className="text-xs mt-2"><span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700">{c.status}</span></div>
                   </div>
                 </div>
@@ -223,6 +276,36 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+
+      {/* Category Form Dialog */}
+      <Dialog open={showCatForm} onOpenChange={setShowCatForm}>
+        <DialogContent className="max-w-lg">
+          {categoryEdit && (<>
+            <DialogHeader><DialogTitle className="font-display text-2xl">{categoryEdit.id ? 'Edit' : 'Add'} Category</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div><Label>Name</Label><Input value={categoryEdit.name} onChange={e => setCategoryEdit({ ...categoryEdit, name: e.target.value, slug: categoryEdit.id ? categoryEdit.slug : e.target.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') })} /></div>
+              <div><Label>Slug</Label><Input value={categoryEdit.slug} onChange={e => setCategoryEdit({ ...categoryEdit, slug: e.target.value })} className="font-mono" /></div>
+              <div><Label>Description</Label><Textarea rows={2} value={categoryEdit.description || ''} onChange={e => setCategoryEdit({ ...categoryEdit, description: e.target.value })} /></div>
+              <div><Label>Thumbnail Image URL</Label><Input value={categoryEdit.thumbnail || ''} onChange={e => setCategoryEdit({ ...categoryEdit, thumbnail: e.target.value, banner: categoryEdit.banner || e.target.value })} placeholder="https://..." /></div>
+              <div><Label>Banner Image URL</Label><Input value={categoryEdit.banner || ''} onChange={e => setCategoryEdit({ ...categoryEdit, banner: e.target.value })} placeholder="https://..." /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Display Order</Label><Input type="number" value={categoryEdit.displayOrder || 0} onChange={e => setCategoryEdit({ ...categoryEdit, displayOrder: +e.target.value })} /></div>
+                <div><Label>Status</Label>
+                  <Select value={categoryEdit.status || 'active'} onValueChange={v => setCategoryEdit({ ...categoryEdit, status: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {categoryEdit.thumbnail && <img src={categoryEdit.thumbnail} className="w-full h-32 object-cover rounded-lg" alt="preview" />}
+            </div>
+            <div className="flex gap-2 justify-end mt-4">
+              <Button variant="outline" onClick={() => { setShowCatForm(false); setCategoryEdit(null); }}>Cancel</Button>
+              <Button onClick={() => saveCategory(categoryEdit)} disabled={!categoryEdit.name || !categoryEdit.slug}>{categoryEdit.id ? 'Update' : 'Create'}</Button>
+            </div>
+          </>)}
+        </DialogContent>
+      </Dialog>
 
       {/* Order Detail Dialog */}
       <Dialog open={!!orderView} onOpenChange={() => setOrderView(null)}>
@@ -251,6 +334,23 @@ export default function Dashboard() {
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => updateOrderStatus(orderView, 'confirmed', 'verified')} className="bg-green-600 hover:bg-green-700">✓ Approve Payment</Button>
                     <Button size="sm" variant="outline" onClick={() => updateOrderStatus(orderView, 'cancelled', 'failed')} className="border-red-300 text-red-600">✗ Reject</Button>
+                  </div>
+                </div>
+              )}
+              {orderView.statusHistory?.length > 0 && (
+                <div className="p-3 rounded-lg bg-primary-50/40">
+                  <div className="text-xs text-muted-foreground mb-2">Status History</div>
+                  <div className="space-y-2">
+                    {orderView.statusHistory.map((h, i) => (
+                      <div key={i} className="flex items-start gap-2 text-sm">
+                        <div className="w-2 h-2 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="font-medium capitalize">{h.status.replace(/_/g,' ')}</div>
+                          <div className="text-xs text-muted-foreground">{new Date(h.at).toLocaleString('en-IN')}</div>
+                          {h.note && <div className="text-xs text-foreground/80 italic">"{h.note}"</div>}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

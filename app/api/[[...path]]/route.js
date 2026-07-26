@@ -82,6 +82,17 @@ async function handle(request, path, method) {
       if (error) return err(error.message);
       return json({ category: fromRow(data) });
     }
+    if (method === 'PUT' && seg[1] && requireAdmin(request)) {
+      const body = await request.json();
+      const { error } = await client.from('categories').update(toRow(body)).eq('id', seg[1]);
+      if (error) return err(error.message);
+      return json({ ok: true });
+    }
+    if (method === 'DELETE' && seg[1] && requireAdmin(request)) {
+      const { error } = await client.from('categories').delete().eq('id', seg[1]);
+      if (error) return err(error.message);
+      return json({ ok: true });
+    }
   }
 
   // ============= PRODUCTS =============

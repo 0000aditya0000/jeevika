@@ -223,6 +223,52 @@ backend:
       - working: true
         agent: "testing"
         comment: "✅ VERIFIED: Newsletter subscription working perfectly. Valid email returns {ok: true}. Duplicate email handled correctly with upsert. Missing email returns 400 as expected."
+  - task: "Admin category update (PUT /api/categories/{id})"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "PUT /api/categories/{id} (JWT required). Updates category name, description, slug, thumbnail, banner, displayOrder, status."
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: PUT /api/categories/{id} working perfectly. Updated category name and description, verified changes with GET /api/categories. Restored original values successfully. Auth guard working - returns 404 without Bearer token."
+  - task: "Admin category delete (DELETE /api/categories/{id})"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "DELETE /api/categories/{id} (JWT required). Removes category from database."
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: DELETE /api/categories/{id} working perfectly. Created temporary category, deleted it, verified removal with GET /api/categories. Auth guard working - returns 404 without Bearer token."
+  - task: "ChunkLoadError fix on /checkout page"
+    implemented: true
+    working: true
+    file: ".next cache cleared"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "user"
+        comment: "User reported: ChunkLoadError: Loading chunk app/checkout/page failed at URL /checkout"
+      - working: true
+        agent: "main"
+        comment: "Fixed by clearing stale .next cache after Supabase migration. Restarted nextjs service."
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: ChunkLoadError is fixed. GET /checkout returns 200 with valid HTML. No ChunkLoadError text found in response. Page loads successfully."
+
 
 frontend:
   - task: "Luxury home page (hero slider, categories, trending, deals, testimonials, newsletter)"
@@ -275,7 +321,7 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 1
+  test_sequence: 2
   run_ui: false
 
 test_plan:
@@ -298,6 +344,21 @@ agent_communication:
          - ensureSeed() checks settings.seeded=true and inserts categories/products/testimonials/admin.
          - Nested JSONB fields (customer, items, colors, sizes, images, status_history) preserve camelCase inside.
       6. Verified manually: /api/products, /api/categories, /api/testimonials all return seeded rows.
+
+  - agent: "main"
+    message: |
+      Bug fix + admin enhancement round.
+      1) FIX: ChunkLoadError on /checkout — caused by stale .next cache after Supabase migration.
+         Cleared .next and restarted nextjs. /checkout now returns 200.
+      2) NEW backend endpoints (need testing):
+         - PUT /api/categories/{id}   (admin, JWT required) — updates category fields
+         - DELETE /api/categories/{id} (admin, JWT required) — deletes category
+      3) Admin dashboard enhancements (frontend only, no test needed):
+         - Orders tab: search bar (matches orderId prefix like JC202607260001, name, phone, email) + status filter dropdown
+         - Order detail dialog: full statusHistory timeline (each entry shows status, timestamp, optional note)
+         - Categories tab: "Add Category" button, hover Edit/Delete buttons on each card, full add/edit dialog with name/slug/description/thumbnail/banner/displayOrder/status + live thumbnail preview
+      Please test ONLY the two new endpoints (PUT/DELETE /api/categories/{id}) plus a regression on the existing endpoints affected by the .next cache clear. Admin login creds unchanged: admin@jeevikaacouture.com / Jeevikaa@2025.
+
          Admin login returns JWT successfully.
       Please re-run the same 6 test groups you ran before, this time against Supabase. Only backend changes; frontend untouched.
   - agent: "testing"
@@ -382,3 +443,36 @@ agent_communication:
       - Missing email returns 400
       
       NO CRITICAL ISSUES FOUND. All backend APIs are production-ready.
+  - agent: "testing"
+    message: |
+      ✅ REGRESSION + NEW ENDPOINTS TESTING COMPLETE - ALL 10 TESTS PASSED (100%)
+      
+      Tested bug fix and new admin category endpoints after .next cache clear:
+      
+      ✅ REGRESSION TESTS (5/5):
+      - GET /api/products returns 8+ products ✅
+      - GET /api/products/rose-blush-silk-saree returns product + related ✅
+      - POST /api/orders (COD) creates order with JC-prefixed orderId (JC202607265249) ✅
+      - GET /api/orders/track/{orderId} returns the order ✅
+      - POST /api/admin/login returns JWT ✅
+      
+      ✅ NEW ADMIN ENDPOINTS (2/2):
+      - PUT /api/categories/{id} updates category name & description ✅
+        * Verified update with GET /api/categories
+        * Successfully restored original values
+      - DELETE /api/categories/{id} deletes category ✅
+        * Created temp category "Test Category To Delete"
+        * Deleted successfully
+        * Verified removal with GET /api/categories
+      
+      ✅ AUTH GUARDS (2/2):
+      - PUT /api/categories/{id} WITHOUT Authorization → 404 (blocked) ✅
+      - DELETE /api/categories/{id} WITHOUT Authorization → 404 (blocked) ✅
+      
+      ✅ CHUNK ERROR FIX (1/1):
+      - GET /checkout returns 200 with valid HTML ✅
+      - No "ChunkLoadError" text found in response ✅
+      - Bug is FIXED - page loads successfully
+      
+      NO CRITICAL ISSUES FOUND. All existing endpoints still work after cache clear. New category management endpoints working perfectly with proper auth guards.
+
