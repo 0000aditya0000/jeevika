@@ -24,20 +24,33 @@ function TrackContent() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const track = async (orderId) => {
-    if (!orderId) return;
+  const track = async (orderIdRaw) => {
+    const orderId = (orderIdRaw || '').trim().toUpperCase();
+    if (!orderId) { setError('Please enter your Order ID'); return; }
     setLoading(true); setError(''); setOrder(null);
-    const res = await fetch(`/api/orders/track/${orderId}`);
-    const data = await res.json();
-    setLoading(false);
-    if (data.error) setError(data.error);
-    else setOrder(data.order);
+    try {
+      const res = await fetch(`/api/orders/track/${encodeURIComponent(orderId)}`, { cache: 'no-store' });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setError(data.error || `Order "${orderId}" not found. Please check the ID (starts with JC) and try again.`);
+      } else if (data.order) {
+        setOrder(data.order);
+        setId(orderId);
+      } else {
+        setError('Something went wrong. Please try again.');
+      }
+    } catch (e) {
+      setError('Network error. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { if (sp.get('id')) track(sp.get('id')); }, [sp]);
+  useEffect(() => { const q = sp.get('id'); if (q) track(q); }, [sp]);
 
-  const currentIdx = order ? STAGES.findIndex(s => s.key === order.status) : -1;
   const isCancelled = order?.status === 'cancelled';
+  const isPaymentPending = order?.status === 'payment_pending';
+  const currentIdx = order ? STAGES.findIndex(s => s.key === order.status) : -1;
 
   return (
     <div className="container mx-auto px-4 py-14 max-w-3xl">
@@ -47,12 +60,18 @@ function TrackContent() {
       </div>
 
       <div className="flex gap-3 max-w-md mx-auto">
-        <Input value={id} onChange={e => setId(e.target.value.toUpperCase())} placeholder="e.g. JC202506250001" className="h-12 rounded-full" />
-        <Button onClick={() => track(id)} className="h-12 rounded-full px-6">Track</Button>
+        <Input value={id} onChange={e => setId(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && track(id)} placeholder="e.g. JC202607260001" className="h-12 rounded-full" />
+        <Button onClick={() => track(id)} disabled={loading} className="h-12 rounded-full px-6">{loading ? 'Tracking...' : 'Track'}</Button>
       </div>
 
       {loading && <div className="mt-10 text-center text-muted-foreground">Fetching your order...</div>}
-      {error && <div className="mt-10 text-center text-destructive">{error}</div>}
+      {error && !loading && (
+        <div className="mt-10 text-center max-w-md mx-auto p-6 rounded-2xl bg-red-50 border border-red-200">
+          <div className="text-3xl mb-2">📦</div>
+          <div className="text-destructive font-medium">{error}</div>
+          <div className="text-xs text-muted-foreground mt-2">Order IDs start with <span className="font-mono font-bold">JC</span> followed by 12 digits (e.g. <span className="font-mono">JC202607260001</span>).</div>
+        </div>
+      )}
 
       {order && (
         <div className="mt-10 bg-white rounded-3xl border border-primary-100 p-6 md:p-8 shadow-soft">
@@ -74,6 +93,11 @@ function TrackContent() {
 
           {isCancelled ? (
             <div className="mt-8 p-6 rounded-2xl bg-red-50 border border-red-100 text-red-700 flex items-center gap-3"><XCircle className="w-6 h-6" /> This order was cancelled.</div>
+          ) : isPaymentPending ? (
+            <div className="mt-8 p-6 rounded-2xl bg-yellow-50 border border-yellow-200 text-yellow-900">
+              <div className="font-semibold flex items-center gap-2">⏳ Payment Verification Pending</div>
+              <div className="text-sm mt-2">Your payment {order.utrNumber && <>with UTR <span className="font-mono font-semibold">{order.utrNumber}</span></>} is being verified. You'll receive a confirmation email within approximately 30 minutes.</div>
+            </div>
           ) : (
             <div className="mt-8">
               <div className="flex justify-between relative">
