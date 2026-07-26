@@ -16,6 +16,7 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [utrNumber, setUtrNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [orderPlaced, setOrderPlaced] = useState(false);
   const [payCfg, setPayCfg] = useState({ upiId: 'jeevikaacouture@upi', merchantName: 'Jeevikaa Couture', phone: '', qrImageUrl: '', instructions: '' });
   const [customer, setCustomer] = useState({ fullName: '', phone: '', email: '', address: '', city: '', state: '', pincode: '', landmark: '', altPhone: '', notes: '' });
 
@@ -23,10 +24,16 @@ export default function Checkout() {
     fetch('/api/settings/payment').then(r => r.json()).then(d => { if (d.value) setPayCfg(prev => ({ ...prev, ...d.value })); }).catch(() => {});
   }, []);
 
-  if (hydrated && cart.length === 0) {
-    if (typeof window !== 'undefined') router.push('/cart');
-    return null;
-  }
+  // Redirect to cart ONLY if the user landed on checkout with an already-empty cart.
+  // Do NOT redirect after clearCart() runs post-order-placement.
+  useEffect(() => {
+    if (hydrated && !orderPlaced && cart.length === 0) {
+      router.replace('/cart');
+    }
+  }, [hydrated, cart.length, orderPlaced, router]);
+
+  if (!hydrated) return <div className="container py-20 text-center">Loading...</div>;
+  if (!orderPlaced && cart.length === 0) return null;
 
   const shipping = cartSubtotal >= 2999 ? 0 : 149;
   const total = cartSubtotal + shipping;
@@ -39,11 +46,20 @@ export default function Checkout() {
       }) });
       const data = await res.json();
       if (data.order) {
+        // Set orderPlaced BEFORE clearing cart to prevent the empty-cart useEffect from redirecting to /cart.
+        setOrderPlaced(true);
+        const url = `/order-success?orderId=${data.order.orderId}&method=${paymentMethod}`;
         clearCart();
-        router.push(`/order-success?orderId=${data.order.orderId}&method=${paymentMethod}`);
-      } else toast.error(data.error || 'Something went wrong');
-    } catch { toast.error('Failed to place order'); }
-    setSubmitting(false);
+        // Use replace so the user can't press Back to re-submit the (now-empty) checkout.
+        router.replace(url);
+      } else {
+        toast.error(data.error || 'Something went wrong');
+        setSubmitting(false);
+      }
+    } catch (e) {
+      toast.error('Failed to place order');
+      setSubmitting(false);
+    }
   };
 
   const canProceed = customer.fullName && customer.phone && customer.email && customer.address && customer.city && customer.state && customer.pincode;
