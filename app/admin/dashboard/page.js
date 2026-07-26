@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LayoutDashboard, ShoppingBag, Package, Users, Tag, LogOut, Plus, Edit, Trash2, TrendingUp, IndianRupee, Clock, CheckCircle2, Eye, CreditCard, QrCode, Upload, Phone } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Package, Users, Tag, LogOut, Plus, Edit, Trash2, TrendingUp, IndianRupee, Clock, CheckCircle2, Eye, CreditCard, QrCode, Upload, Phone, User, Lock, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 const NAV = [
@@ -16,6 +16,7 @@ const NAV = [
   { key: 'products', label: 'Products', icon: Package },
   { key: 'categories', label: 'Categories', icon: Tag },
   { key: 'payment', label: 'Payment Settings', icon: CreditCard },
+  { key: 'profile', label: 'My Profile', icon: User },
 ];
 
 const STATUS_OPTIONS = ['placed','payment_pending','confirmed','processing','packed','shipped','out_for_delivery','delivered','cancelled'];
@@ -42,6 +43,8 @@ export default function Dashboard() {
   const [sizesText, setSizesText] = useState('');
   const [colorsText, setColorsText] = useState('');
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [profileForm, setProfileForm] = useState({ name: '', email: '', currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [savingProfile, setSavingProfile] = useState(false);
 
   // When product form opens, seed the text-buffer inputs so users can type commas freely.
   useEffect(() => {
@@ -141,6 +144,31 @@ export default function Dashboard() {
     const removed = productEdit.images[idx];
     const newImages = productEdit.images.filter((_, i) => i !== idx);
     setProductEdit({ ...productEdit, images: newImages, thumbnail: productEdit.thumbnail === removed ? (newImages[0] || '') : productEdit.thumbnail });
+  };
+
+  useEffect(() => {
+    if (admin) setProfileForm(prev => ({ ...prev, name: admin.name || '', email: admin.email || '' }));
+  }, [admin]);
+
+  const saveProfile = async () => {
+    if (profileForm.newPassword && profileForm.newPassword !== profileForm.confirmPassword) {
+      toast.error("New password and confirmation don't match"); return;
+    }
+    setSavingProfile(true);
+    const body = { currentPassword: profileForm.currentPassword, name: profileForm.name, email: profileForm.email };
+    if (profileForm.newPassword) body.newPassword = profileForm.newPassword;
+    const res = await authFetch('/api/admin/profile', { method: 'PUT', body: JSON.stringify(body) });
+    const data = await res.json();
+    setSavingProfile(false);
+    if (!res.ok) { toast.error(data.error || 'Failed to save profile'); return; }
+    if (data.token) {
+      localStorage.setItem('jc_admin_token', data.token);
+      localStorage.setItem('jc_admin', JSON.stringify(data.admin));
+      setToken(data.token);
+      setAdmin(data.admin);
+    }
+    setProfileForm(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
+    toast.success('Profile updated ✨');
   };
 
   const setProductThumbnail = (url) => setProductEdit({ ...productEdit, thumbnail: url });
@@ -343,6 +371,56 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+        {tab === 'profile' && (
+          <div className="max-w-2xl">
+            <h1 className="font-display text-3xl font-bold">My Profile</h1>
+            <p className="text-muted-foreground mt-1">Update your admin login credentials. Your session will refresh automatically.</p>
+            <div className="mt-6 bg-white rounded-2xl border border-primary-100 shadow-soft p-6 space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Full Name</Label>
+                  <Input value={profileForm.name} onChange={e => setProfileForm({ ...profileForm, name: e.target.value })} className="mt-1" />
+                </div>
+                <div>
+                  <Label>Email (username)</Label>
+                  <Input type="email" value={profileForm.email} onChange={e => setProfileForm({ ...profileForm, email: e.target.value })} className="mt-1" />
+                  <div className="text-[10px] text-muted-foreground mt-1">You'll use this email to sign in.</div>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-primary-100">
+                <div className="text-sm font-semibold flex items-center gap-2 mb-3"><Lock className="w-4 h-4 text-primary" /> Change Password (optional)</div>
+                <div className="space-y-3">
+                  <div>
+                    <Label>Current Password *</Label>
+                    <Input type="password" value={profileForm.currentPassword} onChange={e => setProfileForm({ ...profileForm, currentPassword: e.target.value })} className="mt-1" placeholder="Required to save any change" />
+                    <div className="text-[10px] text-muted-foreground mt-1">You must enter your current password to save any changes.</div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <div>
+                      <Label>New Password</Label>
+                      <Input type="password" value={profileForm.newPassword} onChange={e => setProfileForm({ ...profileForm, newPassword: e.target.value })} className="mt-1" placeholder="Leave blank to keep current" />
+                      <div className="text-[10px] text-muted-foreground mt-1">Minimum 6 characters.</div>
+                    </div>
+                    <div>
+                      <Label>Confirm New Password</Label>
+                      <Input type="password" value={profileForm.confirmPassword} onChange={e => setProfileForm({ ...profileForm, confirmPassword: e.target.value })} className="mt-1" placeholder="Repeat new password" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-primary-100 flex gap-2 justify-end">
+                <Button onClick={() => setProfileForm({ name: admin?.name || '', email: admin?.email || '', currentPassword: '', newPassword: '', confirmPassword: '' })} variant="outline" className="rounded-full">Reset</Button>
+                <Button onClick={saveProfile} disabled={savingProfile || !profileForm.currentPassword} className="rounded-full">
+                  <Save className="w-4 h-4 mr-1" /> {savingProfile ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            </div>
+            <div className="mt-4 text-xs bg-yellow-50 border border-yellow-200 p-3 rounded-lg text-yellow-900">
+              ⚠ For security: change the default password (<span className="font-mono">Jeevikaa@2025</span>) to something strong. Use at least 12 characters with a mix of letters, numbers, and symbols.
+            </div>
+          </div>
+        )}
+
         {tab === 'payment' && (
           <div>
             <h1 className="font-display text-3xl font-bold">Payment Settings</h1>

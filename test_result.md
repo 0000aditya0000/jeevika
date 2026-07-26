@@ -498,6 +498,32 @@ agent_communication:
       - Correct login returns JWT token and admin data
       - Protected endpoints blocked without auth
       - Protected endpoints accessible with Bearer token
+
+  - agent: "main"
+    message: |
+      New feature: admin can change their own email/name/password from the dashboard.
+
+      NEW ENDPOINT: PUT /api/admin/profile
+      - Requires Bearer JWT of admin.
+      - Body: { currentPassword (required), name?, email?, newPassword? }
+      - Verifies currentPassword against stored PBKDF2 hash before applying changes.
+      - Rejects with "Email already in use by another admin" if the new email collides with another admin row.
+      - If newPassword provided, must be ≥ 6 chars; server re-hashes with PBKDF2.
+      - Returns { ok: true, token, admin } — a fresh JWT reflecting the new email/name so the client can seamlessly stay logged in.
+
+      Frontend: added "My Profile" tab in admin sidebar with a form (name, email, current password, new password, confirm new password) + client-side confirm-match check + Reset button.
+
+      Please test:
+      1) Login as admin → PUT /api/admin/profile with WRONG currentPassword → 401 "Current password is incorrect".
+      2) PUT /api/admin/profile without any Authorization → 401 Unauthorized (or 404).
+      3) PUT /api/admin/profile with correct currentPassword + name change → 200, returns fresh token + updated admin object.
+      4) PUT with correct currentPassword + newPassword "NewPass123!" → 200 fresh token; then login with new password succeeds; login with old password 401.
+      5) Restore original password ("Jeevikaa@2025") for follow-up tests.
+      6) Email collision: create a second admin manually (INSERT INTO admins…) OR skip if not feasible; attempt to change the primary admin's email to that duplicate → 400 with "Email already in use by another admin".
+      7) newPassword shorter than 6 chars → 400 "New password must be at least 6 characters".
+      8) Empty body (only currentPassword, nothing to update) → 200 with { ok: true, message: "No changes" }.
+      Light regression: POST /api/admin/login, GET /api/products?limit=3, GET /api/orders (with auth), GET /api/admin/stats.
+
       - Admin stats returns all required fields with correct values
       
       ✅ ADMIN CRUD (9 tests):

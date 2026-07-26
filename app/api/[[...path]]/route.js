@@ -224,6 +224,31 @@ async function handle(request, path, method) {
       if (!p) return err('Unauthorized', 401);
       return json({ admin: p });
     }
+    if (seg[1] === 'profile' && method === 'PUT') {
+      const p = requireAdmin(request);
+      if (!p) return err('Unauthorized', 401);
+      const body = await request.json();
+      const { currentPassword, newPassword, email, name } = body;
+      if (!currentPassword) return err('Current password required');
+      const { data: admin } = await client.from('admins').select('*').eq('id', p.id).maybeSingle();
+      if (!admin || !verifyPassword(currentPassword, admin.password_hash)) return err('Current password is incorrect', 401);
+      const update = {};
+      if (email && email !== admin.email) {
+        const { data: existing } = await client.from('admins').select('id').eq('email', email).neq('id', p.id).maybeSingle();
+        if (existing) return err('Email already in use by another admin');
+        update.email = email;
+      }
+      if (name) update.name = name;
+      if (newPassword) {
+        if (newPassword.length < 6) return err('New password must be at least 6 characters');
+        update.password_hash = hashPassword(newPassword);
+      }
+      if (Object.keys(update).length === 0) return json({ ok: true, message: 'No changes' });
+      const { error } = await client.from('admins').update(update).eq('id', p.id);
+      if (error) return err(error.message);
+      const token = signToken({ id: admin.id, email: update.email || admin.email, role: 'admin', name: update.name || admin.name });
+      return json({ ok: true, token, admin: { id: admin.id, email: update.email || admin.email, name: update.name || admin.name, role: admin.role } });
+    }
     if (seg[1] === 'stats' && method === 'GET' && requireAdmin(request)) {
       const { data: orders } = await client.from('orders').select('total, status, created_at');
       const today = new Date(); today.setHours(0, 0, 0, 0);
