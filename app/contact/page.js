@@ -25,11 +25,16 @@ export default function Contact() {
           <Button type="submit" size="lg" className="w-full rounded-full h-12">Send Message</Button>
         </form>
         <div className="space-y-4">
-          {[{ i: MapPin, t: 'Visit our store', s: 'Fashion Street, Bandra West\nMumbai, Maharashtra 400050' }, { i: Phone, t: 'Call us', s: '+91 98765 43210\nMon–Sat, 10 AM – 8 PM' }, { i: Mail, t: 'Email us', s: 'hello@jeevikaacouture.com\nsupport@jeevikaacouture.com' }, { i: MessageCircle, t: 'WhatsApp', s: '+91 98765 43210\nQuick support 24/7' }].map((c, i) => (
-            <div key={i} className="p-5 rounded-2xl bg-primary-50/50 border border-primary-100 flex gap-4">
+          {[
+            { i: Phone, t: 'Call us', s: '+91 92667 22100\nMon–Sat, 10 AM – 8 PM', href: 'tel:+919266722100' },
+            { i: MessageCircle, t: 'WhatsApp', s: '+91 92667 22100\nQuick support 24/7', href: 'https://wa.me/919266722100?text=Hi%20Jeevikaa%20Couture!' },
+            { i: Mail, t: 'Email us', s: 'hello@jeevikaacouture.com\nsupport@jeevikaacouture.com', href: 'mailto:hello@jeevikaacouture.com' },
+            { i: MapPin, t: 'Follow us', s: '@jeevikaa_couture\nInstagram', href: 'https://www.instagram.com/jeevikaa_couture?igsh=cWloNm5iNDB0eWdx&utm_source=qr' },
+          ].map((c, i) => (
+            <a key={i} href={c.href} target={c.href.startsWith('http') ? '_blank' : undefined} rel={c.href.startsWith('http') ? 'noopener noreferrer' : undefined} className="p-5 rounded-2xl bg-primary-50/50 border border-primary-100 flex gap-4 hover:border-primary/40 transition-colors">
               <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center flex-shrink-0"><c.i className="w-5 h-5" /></div>
               <div><div className="font-semibold">{c.t}</div><div className="text-sm text-muted-foreground whitespace-pre-line">{c.s}</div></div>
-            </div>
+            </a>
           ))}
         </div>
       </div>
