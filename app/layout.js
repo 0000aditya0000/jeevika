@@ -8,10 +8,10 @@ const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfa
 const poppins = Poppins({ subsets: ['latin'], weight: ['300','400','500','600','700'], variable: '--font-poppins', display: 'swap' });
 
 export const metadata = {
-  title: 'Jeevikaa Couture — Luxury Women\'s Fashion | Sarees, Lehengas & More',
-  description: 'Discover handcrafted luxury from Jeevikaa Couture — premium sarees, lehengas, gowns, kurtis and more, designed for the modern Indian woman.',
-  keywords: 'sarees, lehengas, kurtis, gowns, indian women fashion, bridal wear, luxury couture',
-  openGraph: { title: 'Jeevikaa Couture', description: 'Luxury women\'s fashion, handcrafted in India.', type: 'website' },
+  title: 'Jeevikaa Couture — Where Elegance Becomes Legacy',
+  description: 'Jeevikaa Couture — founded by Priyanka Kaushik. Fashion created with heart, inspired by love. Premium ethnic wear designed to become a timeless part of your story.',
+  keywords: 'sarees, lehengas, kurtis, gowns, indian women fashion, bridal wear, luxury couture, Jeevikaa Couture',
+  openGraph: { title: 'Jeevikaa Couture', description: 'Where Elegance Becomes Legacy.', type: 'website' },
 };
 
 const App = ({ children }) => {
