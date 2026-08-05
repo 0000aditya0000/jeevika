@@ -10,7 +10,7 @@ import ProductCard from '@/components/ProductCard';
 import { toast } from 'sonner';
 
 const HERO_SLIDES = [
-  { image: 'https://images.pexels.com/photos/37628608/pexels-photo-37628608.jpeg', badge: 'FESTIVE 2025', title: 'Where\ntradition meets\ncouture', sub: 'Handwoven silks. Regal lehengas. Timeless silhouettes designed for the modern Indian woman.', cta1: 'Shop Bridal', cta1Href: '/shop?category=lehengas', cta2: 'View Lookbook', cta2Href: '/shop' },
+  { image: 'https://images.pexels.com/photos/37628608/pexels-photo-37628608.jpeg', badge: 'JEEVIKAA COUTURE', title: 'Where Elegance\nBecomes Legacy', sub: 'Fashion created with heart, inspired by love — premium fabrics, thoughtful craftsmanship, and timeless elegance for every woman.', cta1: 'Shop Bridal', cta1Href: '/shop?category=lehengas', cta2: 'Our Story', cta2Href: '/about' },
   { image: 'https://images.unsplash.com/photo-1617039487629-6babdcb2a24b', badge: 'NEW COLLECTION', title: 'Peony Bloom\nEdit', sub: 'A romantic ode to spring — dreamy pinks, delicate embroidery, and floaty silhouettes made to twirl.', cta1: 'Shop Now', cta1Href: '/shop?filter=new', cta2: 'Explore', cta2Href: '/shop' },
   { image: 'https://images.unsplash.com/photo-1610173827043-9db50e0d8ef9', badge: 'BEST SELLERS', title: 'Draped in\nheritage', sub: 'From Kanjivaram to Banarasi — discover sarees that carry a thousand years of craft.', cta1: 'Shop Sarees', cta1Href: '/shop?category=sarees', cta2: 'Discover', cta2Href: '/shop' },
 ];
