@@ -26,7 +26,6 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # local env files (SECRETS)
-.env
 .env*.local
 .env.development.local
 .env.test.local
@@ -52,3 +51,7 @@ memory/
 supabase/*.sql.bak
 node_modules/@next/swc-linux-arm64-musl/next-swc.linux-arm64-musl.node
 node_modules/@next/swc-linux-arm64-gnu/next-swc.linux-arm64-gnu.node
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+config.bat

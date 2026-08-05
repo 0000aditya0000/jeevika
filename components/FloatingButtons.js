@@ -11,10 +11,10 @@ export default function FloatingButtons() {
   }, []);
   return (
     <>
-      <a href="https://wa.me/919876543210?text=Hi%20Jeevikaa%20Couture!" target="_blank" rel="noopener noreferrer" className="fixed bottom-6 right-6 z-30 w-14 h-14 bg-[#25D366] text-white rounded-full shadow-luxury flex items-center justify-center hover:scale-110 transition-transform animate-float" aria-label="WhatsApp">
+      <a href="https://wa.me/919266722100?text=Hi%20Jeevikaa%20Couture!" target="_blank" rel="noopener noreferrer" className="fixed bottom-6 right-6 z-30 w-14 h-14 bg-[#25D366] text-white rounded-full shadow-luxury flex items-center justify-center hover:scale-110 transition-transform animate-float" aria-label="WhatsApp">
         <MessageCircle className="w-6 h-6" />
       </a>
-      <a href="tel:+919876543210" className="fixed bottom-24 right-6 z-30 w-12 h-12 bg-primary text-white rounded-full shadow-luxury flex items-center justify-center hover:scale-110 transition-transform" aria-label="Call">
+      <a href="tel:+919266722100" className="fixed bottom-24 right-6 z-30 w-12 h-12 bg-primary text-white rounded-full shadow-luxury flex items-center justify-center hover:scale-110 transition-transform" aria-label="Call">
         <Phone className="w-5 h-5" />
       </a>
       {showTop && (
