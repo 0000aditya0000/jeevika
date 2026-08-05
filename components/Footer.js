@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Instagram, Facebook, Youtube, Mail, Phone, MapPin } from 'lucide-react';
+import { Instagram, Facebook, Youtube, Mail, Phone } from 'lucide-react';
 
 export default function Footer() {
   return (
@@ -9,11 +9,12 @@ export default function Footer() {
           <div className="col-span-2 md:col-span-1">
             <div className="font-display text-3xl font-bold text-white">Jeevikaa</div>
             <div className="text-xs tracking-[0.3em] text-accent font-medium mt-1">C O U T U R E</div>
-            <p className="text-sm text-white/60 mt-4 leading-relaxed">Handcrafted luxury for the modern Indian woman. Timeless pieces designed to make you feel like royalty, every single day.</p>
+            <p className="text-sm text-accent/90 mt-3 font-display italic">Where Elegance Becomes Legacy.</p>
+            <p className="text-sm text-white/60 mt-3 leading-relaxed">Fashion created with heart, inspired by love, and designed to become a timeless part of your story.</p>
             <div className="flex gap-3 mt-5">
-              <a href="#" className="w-9 h-9 rounded-full bg-white/10 hover:bg-primary flex items-center justify-center transition-colors"><Instagram className="w-4 h-4" /></a>
-              <a href="#" className="w-9 h-9 rounded-full bg-white/10 hover:bg-primary flex items-center justify-center transition-colors"><Facebook className="w-4 h-4" /></a>
-              <a href="#" className="w-9 h-9 rounded-full bg-white/10 hover:bg-primary flex items-center justify-center transition-colors"><Youtube className="w-4 h-4" /></a>
+              <a href="https://www.instagram.com/jeevikaa_couture?igsh=cWloNm5iNDB0eWdx&utm_source=qr" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="w-9 h-9 rounded-full bg-white/10 hover:bg-primary flex items-center justify-center transition-colors"><Instagram className="w-4 h-4" /></a>
+              <a href="#" className="w-9 h-9 rounded-full bg-white/10 hover:bg-primary flex items-center justify-center transition-colors" aria-label="Facebook"><Facebook className="w-4 h-4" /></a>
+              <a href="#" className="w-9 h-9 rounded-full bg-white/10 hover:bg-primary flex items-center justify-center transition-colors" aria-label="YouTube"><Youtube className="w-4 h-4" /></a>
             </div>
           </div>
           <div>
@@ -39,9 +40,9 @@ export default function Footer() {
           <div>
             <h4 className="font-display text-lg text-accent mb-4">Reach Us</h4>
             <ul className="space-y-3 text-sm text-white/70">
-              <li className="flex items-start gap-2"><MapPin className="w-4 h-4 mt-0.5 text-accent flex-shrink-0" /> Fashion Street, Bandra West, Mumbai 400050</li>
-              <li className="flex items-center gap-2"><Phone className="w-4 h-4 text-accent" /> +91 98765 43210</li>
-              <li className="flex items-center gap-2"><Mail className="w-4 h-4 text-accent" /> hello@jeevikaacouture.com</li>
+              <li className="flex items-center gap-2"><Phone className="w-4 h-4 text-accent flex-shrink-0" /><a href="tel:+919266722100" className="hover:text-accent transition-colors">+91 92667 22100</a></li>
+              <li className="flex items-center gap-2"><Mail className="w-4 h-4 text-accent flex-shrink-0" /><a href="mailto:hello@jeevikaacouture.com" className="hover:text-accent transition-colors">hello@jeevikaacouture.com</a></li>
+              <li className="flex items-center gap-2"><Instagram className="w-4 h-4 text-accent flex-shrink-0" /><a href="https://www.instagram.com/jeevikaa_couture?igsh=cWloNm5iNDB0eWdx&utm_source=qr" target="_blank" rel="noopener noreferrer" className="hover:text-accent transition-colors">@jeevikaa_couture</a></li>
             </ul>
           </div>
         </div>

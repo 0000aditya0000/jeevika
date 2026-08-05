@@ -6,21 +6,23 @@ export default function About() {
         <div className="absolute inset-0 bg-black/50" />
         <div className="relative text-center text-white px-4">
           <div className="text-xs tracking-[0.4em] text-accent font-semibold mb-3">OUR STORY</div>
-          <h1 className="font-display text-5xl md:text-7xl font-bold">About Jeevikaa</h1>
+          <h1 className="font-display text-5xl md:text-7xl font-bold">About Us</h1>
+          <p className="mt-4 text-lg md:text-xl text-white/85 font-display italic">Where Elegance Becomes Legacy.</p>
         </div>
       </section>
       <section className="py-20">
         <div className="container mx-auto px-4 max-w-3xl text-center">
-          <p className="font-display text-2xl md:text-3xl italic text-primary leading-relaxed">“Craftsmanship whispered down generations, reimagined for the woman of today.”</p>
+          <p className="font-display text-2xl md:text-3xl italic text-primary leading-relaxed">Every brand has a story. Jeevikaa Couture has a heartbeat.</p>
           <div className="mt-10 text-base md:text-lg text-foreground/80 leading-relaxed space-y-6 text-left">
-            <p>Jeevikaa Couture began as a small atelier in Mumbai in 2015, with a simple belief — that every woman deserves clothes that make her feel truly seen. Today, we work with over 200 artisans across India, from the Banarasi weavers of Varanasi to the mirror-work craftswomen of Kutch.</p>
-            <p>Each piece is handcrafted, ethically made, and lovingly finished. We source only the finest fabrics, use age-old techniques passed through generations, and design silhouettes that celebrate the modern Indian woman — her confidence, her heritage, and her joy.</p>
-            <p>From bridal lehengas that carry a family's story to everyday kurtis that turn ordinary mornings into rituals, Jeevikaa is where tradition meets today. Welcome to our world.</p>
+            <p>Founded by Priyanka Kaushik, Jeevikaa Couture is more than a fashion label—it’s a mother’s dream brought to life. Inspired by her daughter, Jeevikaa, the brand was created as a symbol of love, hope, and the desire to build a legacy that would inspire generations.</p>
+            <p>For Priyanka, fashion has always been about more than beautiful clothing. It is about creating pieces that make every woman feel confident, graceful, and truly herself. With this vision, she set out to build a brand where every outfit is designed with care, crafted with precision, and finished with timeless elegance.</p>
+            <p>At Jeevikaa Couture, every collection reflects a perfect blend of premium fabrics, thoughtful craftsmanship, and contemporary design while honoring the beauty of Indian traditions. Every stitch tells a story of dedication, every silhouette celebrates individuality, and every creation is made with love.</p>
+            <p>What began as a mother’s tribute to her daughter has become a brand that celebrates women from every walk of life. Through Jeevikaa Couture, Priyanka Kaushik hopes to bring confidence, elegance, and joy to every wardrobe while building a legacy inspired by the name that means the most to her—Jeevikaa.</p>
+            <p>Welcome to Jeevikaa Couture, where fashion is created with heart, inspired by love, and designed to become a timeless part of your story.</p>
           </div>
-          <div className="grid grid-cols-3 gap-8 mt-16 text-center">
-            <div><div className="font-display text-4xl md:text-5xl font-bold text-primary">10K+</div><div className="text-sm text-muted-foreground mt-1">Happy customers</div></div>
-            <div><div className="font-display text-4xl md:text-5xl font-bold text-primary">200+</div><div className="text-sm text-muted-foreground mt-1">Master artisans</div></div>
-            <div><div className="font-display text-4xl md:text-5xl font-bold text-primary">4.9★</div><div className="text-sm text-muted-foreground mt-1">Average rating</div></div>
+          <div className="mt-16 pt-10 border-t border-primary-100">
+            <div className="font-display text-3xl md:text-4xl font-bold text-primary">Jeevikaa Couture</div>
+            <div className="text-sm tracking-[0.25em] text-muted-foreground mt-2 uppercase">Where Elegance Becomes Legacy.</div>
           </div>
         </div>
       </section>
